@@ -43,3 +43,25 @@ class C3dAffineTool(CommandLine):
         }
 
         return _outputs
+
+class ConvertITKtoFSLWarpInputSpec(CommandLineInputSpec):
+    itk_warp = File(argstr="-from-itk %s", position=0, desc="ITK warp")
+    fsl_warp = File(argstr="-to-fnirt %s", position=1, desc="FSL warp")
+    reference = File(argstr="%s", position=2, desc="Reference")
+
+
+class ConvertITKtoFSLWarpOutputSpec(TraitedSpec):
+    fsl_warp = File(desc="FSL warp")
+
+
+class ConvertITKtoFSLWarp(CommandLine):
+    _cmd = "wb_command -convert-warpfield"
+    input_spec = ConvertITKtoFSLWarpInputSpec
+    output_spec = ConvertITKtoFSLWarpOutputSpec
+
+    def _list_outputs(self):
+        _outputs = {
+            "fsl_warp": os.path.abspath(self.inputs.fsl_warp),
+        }
+
+        return _outputs

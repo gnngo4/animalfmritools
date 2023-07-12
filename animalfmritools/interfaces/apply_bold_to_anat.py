@@ -38,6 +38,7 @@ def _ApplyBoldToAnat(
             reference=anat_resampled,
             premat=vol_mat,
             warp1=bold_to_anat_warp,
+            relwarp=True,
         )
         res = convert_warp.run()
         vol_warp = res.outputs.out_file
