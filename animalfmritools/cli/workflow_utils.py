@@ -84,14 +84,14 @@ def setup_buffer_nodes(wf_manager: WorkflowManager) -> BufferNodes:
 
     # bold - session-level - buffer
     bold_session_template_buffer = pe.Node(
-        niu.IdentityInterface(["bold_session_template_buffer"]),
+        niu.IdentityInterface(["bold_session_template"]),
         name = "bold_session_template_buffer"
     )
 
     # reg - [session|PE]-to-session template - affine registrations
     bold_session_template_reg_buffer = pe.Node(
         niu.IdentityInterface(
-            [f"bold_session_{run_type}_to_bold_session_template_reg_buffer" for run_type in bold_session_buffer.keys()]
+            [f"bold_session_{run_type}_to_bold_session_template_reg" for run_type in bold_session_buffer.keys()]
         ),
         name = "bold_session_template_reg_buffer"
     )
@@ -133,3 +133,9 @@ def jsonify(_dict):
         json.dump(_dict, f)
 
     return filename
+
+def listify_three_inputs(input_1, input_2, input_3):    
+    return [input_1, input_2, input_3]
+
+def get_split_volume(out_files, vol_id):
+    return out_files[vol_id]
