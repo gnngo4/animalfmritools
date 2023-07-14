@@ -1,0 +1,111 @@
+from pathlib import Path
+from pydantic import BaseModel
+from niworkflows.engine.workflows import LiterateWorkflow as Workflow
+from nipype.interfaces import utility as niu
+
+class BaseInfo(BaseModel):
+    sub_id: str
+    ses_id: str
+    task_id: str
+    dir_id: str
+    run_id: str
+
+class DerivativeOutputs(BaseModel):
+    bold_preproc: Path
+    bold_confounds: Path
+    bold_confounds_metadata: Path
+    bold_roi_svg: Path
+
+
+def parse_bids_tag(stem: str, tag: str) -> str:
+
+    assert f"{tag}-" in stem, f"{tag} not found in {stem}."
+    value = stem.split(f"{tag}-")[1].split('_')[0]
+
+    return value
+
+def parse_bold_path(bold_path: Path) -> BaseInfo:
+    stem = bold_path.stem 
+    info = BaseInfo(
+        sub_id = parse_bids_tag(stem, 'sub'),
+        ses_id = parse_bids_tag(stem, 'ses'),
+        task_id = parse_bids_tag(stem, 'task'),
+        dir_id = parse_bids_tag(stem, 'dir'),
+        run_id = parse_bids_tag(stem, 'run'),
+    )
+    return info
+
+def get_source_files(base_info: BaseInfo, derivatives_dir: Path) -> DerivativeOutputs:
+
+    bold_preproc = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/func/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
+        f"_dir-{base_info.dir_id}_run-{base_info.run_id}_space-template_desc-preproc_bold.nii.gz"
+    )
+    bold_confounds = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/func/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
+        f"_dir-{base_info.dir_id}_run-{base_info.run_id}_desc-confounds_timeseries.tsv"
+    )
+    bold_confounds_metadata = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/func/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
+        f"_dir-{base_info.dir_id}_run-{base_info.run_id}_desc-confounds_timeseries.json"
+    )
+    bold_roi_svg = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
+        f"_dir-{base_info.dir_id}_run-{base_info.run_id}_desc-confound_roi.svg"
+    )
+
+    outputs = DerivativeOutputs(
+        bold_preproc = bold_preproc,
+        bold_confounds = bold_confounds,
+        bold_confounds_metadata = bold_confounds_metadata,
+        bold_roi_svg = bold_roi_svg,
+    )
+
+    return outputs
+
+def create_base_directories(outputs: DerivativeOutputs) -> None:
+
+    for k, v in outputs.__annotations__.items():
+        p = getattr(outputs, k).parent
+        if not p.exists():
+            p.mkdir(parents=True)
+
+def init_bold_preproc_derivatives_wf(
+    outputs: DerivativeOutputs,
+    name: str,
+) -> Workflow:
+
+    from nipype.interfaces.io import ExportFile
+    from nipype.pipeline import engine as pe
+
+    workflow = Workflow(name=name)
+
+    # Create all expected parent directories found in `outputs
+    create_base_directories(outputs)
+
+    inputnode_fields = [k for k in outputs.__annotations__.keys()]
+    inputnode = pe.Node(
+        niu.IdentityInterface(fields = inputnode_fields),
+        name = "inputnode"
+    )
+
+    for f in inputnode_fields:
+        out_file = getattr(outputs, f)
+        ds = pe.Node(
+            ExportFile(
+                out_file = out_file,
+                check_extension = False,
+                clobber = True,
+            ),
+            name = f"ds_{f}",
+            run_without_submitting = True,
+        )
+        # fmt: off
+        workflow.connect([(inputnode, ds, [(f, "in_file")])])
+        # fmt: on
+
+    return workflow
