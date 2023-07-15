@@ -3,14 +3,16 @@ sys.path.insert(1, "/opt/animalfmritools")
 
 from animalfmritools.utils.data_grabber import (
     REVERSE_PE_MAPPING,
-    PE_DIR_SCHEMA, 
     PE_DIR_FLIP,
 )
+from animalfmritools.interfaces.apply_bold_to_anat import ApplyBoldToAnat
 from animalfmritools.interfaces.rescale_nifti import RescaleNifti
 from animalfmritools.interfaces.flip_nifti import FlipNifti
 from animalfmritools.interfaces.evenify_nifti import EvenifyNifti
 from animalfmritools.workflows.bold.boldref import init_bold_ref_wf
+from animalfmritools.workflows.bold.confounds import init_bold_confs_wf
 from animalfmritools.workflows.bold.sdc import init_bold_sdc_wf
+from animalfmritools.workflows.derivatives.outputs import parse_bold_path, get_source_files, init_bold_preproc_derivatives_wf
 from animalfmritools.workflows.registration.utils import init_itk_to_fsl_affine_wf
 from animalfmritools.workflows.registration.utils import init_itk_to_fsl_warp_wf
 from nipype.interfaces import utility as niu
@@ -291,7 +293,6 @@ def run():
     )
 
     # Register session bold template to T2w
-        
     initreg_boldtemplate_to_t2w_boldref = pe.Node(Split(dimension="t", out_base_name="split_bold_"), name="initreg_boldtemplate_to_t2w_boldref")
     initreg_boldtemplate_to_t2w_hmc = pe.Node(MCFLIRT(save_mats=False, save_plots=False, save_rms=False), name="initreg_boldtemplate_to_t2w_hmc")
     initreg_boldtemplate_to_t2w_tmean = pe.Node(MeanImage(), name="initreg_boldtemplate_to_t2w_tmean")
@@ -330,7 +331,6 @@ def run():
     # fmt: on
 
     # Register T2w to template
-    # First mask t2w
     mask_t2w_initreg = pe.Node(
         FLIRT(dof=9),
         name = "mask_t2w_initreg_template_to_t2w",
@@ -343,7 +343,6 @@ def run():
         ApplyMask(),
         name = "mask_t2w_apply_mask"
     )
-    # register t2w to template
     initreg_t2w_to_template = pe.Node(
         FLIRT(
             dof=12,
@@ -401,13 +400,12 @@ def run():
     ])
     # fmt: on
 
-    """
     #Process each run
-    for run_type, _bold_buffer in bold_buffer.items():
+    for run_type, _bold_buffer in buffer_nodes.bold.items():
         
-        for bold_ix, bold_input in enumerate(bold_buffer_inputs[run_type]):
+        for bold_ix, bold_input in enumerate(buffer_nodes.bold_inputs[run_type]):
                 
-            bold_path = bold_dict[run_type][bold_ix]
+            bold_path = wf_manager.bold_runs[run_type][bold_ix]
             metadata = load_json_as_dict(
                 Path(str(bold_path).replace('.nii.gz', '.json'))
             )
@@ -431,10 +429,10 @@ def run():
                 (boldref, hmc,[("outputnode.boldref", "ref_file")]),
                 (hmc, normalize_motion,[("par_file", "in_file")]), # NOTE: par_file are rescaled by a factor of 10 due to the `rescale_bold` step
                 (boldref, reg_bold_to_boldtemplate, [("outputnode.boldref", "inputnode.in_file")]),
-                (session_bold_buffer[run_type], reg_bold_to_boldtemplate, [("distorted_bold", "inputnode.t1w_brain")]),
+                (buffer_nodes.bold_session[run_type], reg_bold_to_boldtemplate, [("distorted_bold", "inputnode.t1w_brain")]),
                 (reg_bold_to_boldtemplate, xfm_convert_itk_to_fsl, [("outputnode.itk_bold_to_t1", "inputnode.itk_affine")]),
                 (boldref, xfm_convert_itk_to_fsl, [("outputnode.boldref", "inputnode.source")]),
-                (session_bold_buffer[run_type], xfm_convert_itk_to_fsl, [("distorted_bold", "inputnode.reference")]),
+                (buffer_nodes.bold_session[run_type], xfm_convert_itk_to_fsl, [("distorted_bold", "inputnode.reference")]),
             ])
             # fmt: on
             
@@ -445,13 +443,11 @@ def run():
             #4) reg boldref [session | sdc] to boldref [MAIN - runtype | session | sdc] `session_template_reg_buffer` [inputs: `aff_bold_to_boldtemplate_{run_type}`]
             #5) reg boldref [MAIN - runtype | session | sdc] to T2w `xfm_convert_itk_to_fsl_boldtemplate_to_t2w` [inputs: `fsl_affine`]
             #6) reg T2w to ABI template
-            #
             merge_4_5 = pe.Node(ConvertXFM(concat_xfm=True), name=f"merge_xfms_4-5_{bold_input}_{run_type}")
             merge_2_5 = pe.Node(ConvertWarp(output_type = "NIFTI_GZ", relwarp=True), name = f"merge_xfms_2-5_{bold_input}_{run_type}")
             merge_2_6 = pe.Node(ConvertWarp(output_type = "NIFTI_GZ", relwarp=True), name = f"merge_xfms_2-6_{bold_input}_{run_type}")
 
             # Apply 
-            from animalfmritools.interfaces.apply_bold_to_anat import ApplyBoldToAnat
             apply_bold_to_template = pe.Node(
                 ApplyBoldToAnat(debug=False),
                 name=f"trans_{bold_input}_to_template_{run_type}",
@@ -459,10 +455,10 @@ def run():
             
             # fmt: off
             wf.connect([
-                (session_template_reg_buffer, merge_4_5, [(f"aff_bold_to_boldtemplate_{run_type}", "in_file")]),
+                (buffer_nodes.bold_session_template_reg, merge_4_5, [(f"bold_session_{run_type}_to_bold_session_template_reg", "in_file")]),
                 (xfm_convert_itk_to_fsl_boldtemplate_to_t2w, merge_4_5, [("outputnode.fsl_affine", "in_file2")]),
                 (xfm_convert_itk_to_fsl, merge_2_5, [("outputnode.fsl_affine", "premat")]),
-                (session_bold_buffer[run_type], merge_2_5, [("sdc_warp", "warp1")]),
+                (buffer_nodes.bold_session[run_type], merge_2_5, [("sdc_warp", "warp1")]),
                 (merge_4_5, merge_2_5, [("out_file", "postmat")]),
                 (regrid_t2w, merge_2_5, [("out_file", "reference")]),
                 (merge_2_5, merge_2_6, [("out_file", "warp1")]),
@@ -475,7 +471,6 @@ def run():
             ])
             # fmt: on
 
-            from animalfmritools.workflows.bold.confounds import init_bold_confs_wf
             bold_confs_wf = init_bold_confs_wf(
                 mem_gb=8,
                 metadata=metadata,
@@ -499,10 +494,9 @@ def run():
             ])
             # fmt: on
 
-            from animalfmritools.workflows.derivatives.outputs import parse_bold_path, get_source_files, init_bold_preproc_derivatives_wf
             deriv_outputs = get_source_files(
                 parse_bold_path(bold_path),
-                deriv_dir
+                wf_manager.deriv_dir
             )
             bold_deriv_wf = init_bold_preproc_derivatives_wf(
                 deriv_outputs,
@@ -510,20 +504,17 @@ def run():
             )
             # fmt: off
             wf.connect([
-                (boldref, bold_deriv_wf, [("outputnode.boldref", "inputnode.bold_ref")]),
                 (apply_bold_to_template, bold_deriv_wf, [("t1_bold_path", "inputnode.bold_preproc")]),
                 (bold_confs_wf, bold_deriv_wf, [
                     (("outputnode.confounds_metadata", jsonify), "inputnode.bold_confounds_metadata"),
                     ("outputnode.confounds_file", "inputnode.bold_confounds"),
                     ("outputnode.rois_plot", "inputnode.bold_roi_svg")
                 ]),
+                (reg_bold_to_boldtemplate, bold_deriv_wf, [("outputnode.out_report", "inputnode.reg_from_Dbold_to_Dboldref")]),
             ])
             # fmt: on
-    """
 
     wf.run()
-
-
 
 
 if __name__ == "__main__":

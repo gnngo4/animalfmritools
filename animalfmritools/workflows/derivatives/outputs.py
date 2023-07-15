@@ -15,6 +15,7 @@ class DerivativeOutputs(BaseModel):
     bold_confounds: Path
     bold_confounds_metadata: Path
     bold_roi_svg: Path
+    reg_from_Dbold_to_Dboldref: Path
 
 
 def parse_bids_tag(stem: str, tag: str) -> str:
@@ -57,12 +58,26 @@ def get_source_files(base_info: BaseInfo, derivatives_dir: Path) -> DerivativeOu
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
         f"_dir-{base_info.dir_id}_run-{base_info.run_id}_desc-confound_roi.svg"
     )
+    
+    """
+    Registration is between single bold runs and PE-consistant bold referance run
+    * Calculated for every bold run
+    * PE-consistent bold run is a designated single bold run, 
+    and defined for each PE-direction
+    * D = Distorted (non-SDC corrected)
+    """
+    reg_from_Dbold_to_Dboldref = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
+        f"_dir-{base_info.dir_id}_run-{base_info.run_id}_from-Dbold_to-Dboldref.svg"
+    )
 
     outputs = DerivativeOutputs(
         bold_preproc = bold_preproc,
         bold_confounds = bold_confounds,
         bold_confounds_metadata = bold_confounds_metadata,
         bold_roi_svg = bold_roi_svg,
+        reg_from_Dbold_to_Dboldref = reg_from_Dbold_to_Dboldref,
     )
 
     return outputs
