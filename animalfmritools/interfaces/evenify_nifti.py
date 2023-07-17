@@ -2,7 +2,6 @@ from nipype.interfaces.base import (
     File,
     SimpleInterface,
     TraitedSpec,
-    traits,
 )
 
 import os
@@ -10,9 +9,8 @@ import os
 OUTPATH = "evenified.nii.gz"
 EXPECTED_N_DIMS = [3, 4]
 
-def _EvenifyNifti(nifti_path, out_path=OUTPATH):
 
-    import numpy as np
+def _EvenifyNifti(nifti_path, out_path=OUTPATH):
     import nibabel as nib
 
     img = nib.load(nifti_path)
@@ -25,19 +23,18 @@ def _EvenifyNifti(nifti_path, out_path=OUTPATH):
     for ix, dim_size in enumerate(data.shape[:3]):
         if dim_size % 2 == 1:
             if ix == 0:
-                data = data[:-1,:,:] if n_dims == 3 else data[:-1,:,:,:]
+                data = data[:-1, :, :] if n_dims == 3 else data[:-1, :, :, :]
             elif ix == 1:
-                data = data[:,:-1,:] if n_dims == 3 else data[:,:-1,:,:]
+                data = data[:, :-1, :] if n_dims == 3 else data[:, :-1, :, :]
             elif ix == 2:
-                data = data[:,:,:-1] if n_dims == 3 else data[:,:,:-1,:]
+                data = data[:, :, :-1] if n_dims == 3 else data[:, :, :-1, :]
 
-    nib.save(
-        nib.Nifti1Image(data, img.affine),
-        out_path
-    )
+    nib.save(nib.Nifti1Image(data, img.affine), out_path)
+
 
 class EvenifyNiftiInputSpec(TraitedSpec):
     nifti_path = File(exists=True, desc="nifti path", mandatory=True)
+
 
 class EvenifyNiftiOutputSpec(TraitedSpec):
     out_path = File(exists=True, desc="nifti path with even dimensions enforced")

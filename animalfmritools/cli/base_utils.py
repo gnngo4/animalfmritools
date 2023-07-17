@@ -7,6 +7,7 @@ from animalfmritools.utils.data_grabber import BidsReader
 
 DATADIR = Path("/opt/animalfmritools/animalfmritools/data")
 
+
 class WorkflowManager(BaseModel):
     sub_id: str
     ses_id: str
@@ -18,9 +19,8 @@ class WorkflowManager(BaseModel):
     fmap_runs: Dict[str, List[Path]]
     template: Dict[str, Path]
 
-def get_template_data(
-    base_dir: Path = DATADIR
-) -> Dict[str, Path]:
+
+def get_template_data(base_dir: Path = DATADIR) -> Dict[str, Path]:
     return {
         "Base": base_dir / "TMBTA_Brain_Template.nii.gz",
         "CSF": base_dir / "TMBTA_Ventricles.nii.gz",
@@ -28,14 +28,14 @@ def get_template_data(
         "White": base_dir / "TMBTA_White_eroF.nii.gz",
     }
 
+
 def setup_workflow(
-    sub_id: str, 
-    ses_id: str, 
-    bids_dir: Path, 
+    sub_id: str,
+    ses_id: str,
+    bids_dir: Path,
     deriv_dir: Path,
     scratch_dir: Path,
 ) -> WorkflowManager:
-    
     bids_reader = BidsReader(bids_dir)
     data = {
         "sub_id": sub_id,
@@ -44,9 +44,9 @@ def setup_workflow(
         "deriv_dir": deriv_dir,
         "scratch_dir": scratch_dir,
         "anat": bids_reader.get_anat(sub_id),
-        "bold_runs": bids_reader.get_bold_runs(sub_id, ses_id, ignore_tasks = []),
+        "bold_runs": bids_reader.get_bold_runs(sub_id, ses_id, ignore_tasks=[]),
         "fmap_runs": bids_reader.get_fmap_runs(sub_id, ses_id),
-        "template": get_template_data()
+        "template": get_template_data(),
     }
 
     # Verbose; debug

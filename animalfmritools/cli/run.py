@@ -1,10 +1,14 @@
 import sys
+
 sys.path.insert(1, "/opt/animalfmritools")
+
+from pathlib import Path
 
 from animalfmritools.utils.data_grabber import (
     REVERSE_PE_MAPPING,
     PE_DIR_FLIP,
 )
+from animalfmritools.cli.parser import setup_parser
 from animalfmritools.interfaces.apply_bold_to_anat import ApplyBoldToAnat
 from animalfmritools.interfaces.rescale_nifti import RescaleNifti
 from animalfmritools.interfaces.copy_aff_hdr_nifti import CopyAffineHeaderInfo
@@ -13,7 +17,11 @@ from animalfmritools.interfaces.evenify_nifti import EvenifyNifti
 from animalfmritools.workflows.bold.boldref import init_bold_ref_wf
 from animalfmritools.workflows.bold.confounds import init_bold_confs_wf
 from animalfmritools.workflows.bold.sdc import init_bold_sdc_wf
-from animalfmritools.workflows.derivatives.outputs import parse_bold_path, get_source_files, init_bold_preproc_derivatives_wf
+from animalfmritools.workflows.derivatives.outputs import (
+    parse_bold_path,
+    get_source_files,
+    init_bold_preproc_derivatives_wf,
+)
 from animalfmritools.workflows.registration.utils import init_itk_to_fsl_affine_wf
 from animalfmritools.workflows.registration.utils import init_itk_to_fsl_warp_wf
 from nipype.interfaces import utility as niu
@@ -21,41 +29,45 @@ from nipype.interfaces.utility import Function
 from nipype.interfaces.fsl import MCFLIRT, FLIRT, ApplyWarp, ConvertXFM, ConvertWarp
 from nipype.interfaces.fsl.maths import Threshold, ApplyMask, MeanImage, UnaryMaths
 from nipype.interfaces.fsl.utils import Split
-from nipype.interfaces.ants import N4BiasFieldCorrection, RegistrationSynQuick, ApplyTransforms
+from nipype.interfaces.ants import (
+    N4BiasFieldCorrection,
+    RegistrationSynQuick,
+    ApplyTransforms,
+)
 from nipype.pipeline import engine as pe
 from niworkflows.engine.workflows import LiterateWorkflow as Workflow
 from niworkflows.interfaces.nibabel import GenerateSamplingReference
 from niworkflows.interfaces.confounds import NormalizeMotionParams
 from fmriprep.workflows.bold.registration import init_fsl_bbr_wf
 
-from pathlib import Path
-
-from workflow_utils import jsonify, load_json_as_dict, pick_rel, listify_three_inputs, get_split_volume
+from workflow_utils import (
+    jsonify,
+    load_json_as_dict,
+    pick_rel,
+    listify_three_inputs,
+    get_split_volume,
+)
 from base_utils import setup_workflow
 from workflow_utils import setup_buffer_nodes
 
-RESCALE_FACTOR = 10 # Scale voxel sizes by 10 so that some neuroimaging tools will work for animals
+RESCALE_FACTOR = (
+    10  # Scale voxel sizes by 10 so that some neuroimaging tools will work for animals
+)
+
 
 def run():
-
-    from animalfmritools.cli.parser import setup_parser
-
     parser = setup_parser()
     args = parser.parse_args()
 
     # Subject info
     wf_manager = setup_workflow(
-        args.subject_id,
-        args.session_id,
-        args.bids_dir,
-        args.out_dir,
-        args.scratch_dir
+        args.subject_id, args.session_id, args.bids_dir, args.out_dir, args.scratch_dir
     )
 
     # Instantiate workflow
     wf = Workflow(
-        name = f"animalfmritools_sub-{wf_manager.sub_id}_ses-{wf_manager.ses_id}",
-        base_dir = wf_manager.scratch_dir
+        name=f"animalfmritools_sub-{wf_manager.sub_id}_ses-{wf_manager.ses_id}",
+        base_dir=wf_manager.scratch_dir,
     )
 
     # Set-up buffer nodes
@@ -64,12 +76,22 @@ def run():
     """
     Rescale anat and template
     """
-    rescale_anat = pe.Node(RescaleNifti(rescale_factor = RESCALE_FACTOR), name = "rescale_anat")
-    n4_anat = pe.Node(N4BiasFieldCorrection(), name = "n4_anat")
-    rescale_template = pe.Node(RescaleNifti(rescale_factor = RESCALE_FACTOR), name = 'rescale_template')
-    rescale_template_gm = pe.Node(RescaleNifti(rescale_factor = RESCALE_FACTOR), name = 'rescale_template_gm')
-    rescale_template_wm = pe.Node(RescaleNifti(rescale_factor = RESCALE_FACTOR), name = 'rescale_template_wm')
-    rescale_template_csf = pe.Node(RescaleNifti(rescale_factor = RESCALE_FACTOR), name = 'rescale_template_csf')
+    rescale_anat = pe.Node(
+        RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_anat"
+    )
+    n4_anat = pe.Node(N4BiasFieldCorrection(), name="n4_anat")
+    rescale_template = pe.Node(
+        RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_template"
+    )
+    rescale_template_gm = pe.Node(
+        RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_template_gm"
+    )
+    rescale_template_wm = pe.Node(
+        RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_template_wm"
+    )
+    rescale_template_csf = pe.Node(
+        RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_template_csf"
+    )
 
     # fmt: off
     wf.connect([
@@ -90,22 +112,20 @@ def run():
             for ix, run_path in enumerate(runs):
                 cp_aff_hdr_info = pe.Node(
                     CopyAffineHeaderInfo(
-                        input_image = run_path,
-                        reference_image = wf_manager.bold_runs[REVERSE_PE_MAPPING[run_type]][0],
+                        input_image=run_path,
+                        reference_image=wf_manager.bold_runs[
+                            REVERSE_PE_MAPPING[run_type]
+                        ][0],
                     ),
-                    name = f"bold_cp_aff_hdr_{run_type}_{ix}"
+                    name=f"bold_cp_aff_hdr_{run_type}_{ix}",
                 )
-                flip_nifti = pe.Node(
-                    FlipNifti(),
-                    name = f"bold_flip_{run_type}_{ix}"
-                )
+                flip_nifti = pe.Node(FlipNifti(), name=f"bold_flip_{run_type}_{ix}")
                 evenify_nifti = pe.Node(
-                    EvenifyNifti(),
-                    name = f"bold_evenify_{run_type}_{ix}"
+                    EvenifyNifti(), name=f"bold_evenify_{run_type}_{ix}"
                 )
                 rescale_nifti = pe.Node(
-                    RescaleNifti(rescale_factor = RESCALE_FACTOR),
-                    name = f"bold_rescale_{run_type}_{ix}"
+                    RescaleNifti(rescale_factor=RESCALE_FACTOR),
+                    name=f"bold_rescale_{run_type}_{ix}",
                 )
                 # fmt: off
                 wf.connect([
@@ -123,7 +143,7 @@ def run():
                 )
                 rescale_nifti = pe.Node(
                     RescaleNifti(rescale_factor=10),
-                    name=f"bold_rescale_{run_type}_{ix}"
+                    name=f"bold_rescale_{run_type}_{ix}",
                 )
                 # fmt: off
                 wf.connect([
@@ -140,22 +160,21 @@ def run():
             for ix, run_path in enumerate(runs):
                 cp_aff_hdr_info = pe.Node(
                     CopyAffineHeaderInfo(
-                        input_image = run_path,
-                        reference_image = wf_manager.fmap_runs[REVERSE_PE_MAPPING[run_type]][0],
+                        input_image=run_path,
+                        reference_image=wf_manager.fmap_runs[
+                            REVERSE_PE_MAPPING[run_type]
+                        ][0],
                     ),
-                    name = f"fmap_cp_aff_hdr_{run_type}_{ix}"
+                    name=f"fmap_cp_aff_hdr_{run_type}_{ix}",
                 )
-                flip_nifti = pe.Node(
-                    FlipNifti(), 
-                    name=f"fmap_flip_{run_type}_{ix}"
-                )
+                flip_nifti = pe.Node(FlipNifti(), name=f"fmap_flip_{run_type}_{ix}")
                 evenify_nifti = pe.Node(
                     EvenifyNifti(),
                     name=f"fmap_evenify_{run_type}_{ix}",
                 )
                 rescale_nifti = pe.Node(
                     RescaleNifti(rescale_factor=RESCALE_FACTOR),
-                    name=f"fmap_rescale_{run_type}_{ix}"
+                    name=f"fmap_rescale_{run_type}_{ix}",
                 )
                 # fmt: off
                 wf.connect([
@@ -173,7 +192,7 @@ def run():
                 )
                 rescale_nifti = pe.Node(
                     RescaleNifti(rescale_factor=10),
-                    name=f"fmap_rescale_{run_type}_{ix}"
+                    name=f"fmap_rescale_{run_type}_{ix}",
                 )
                 # fmt: off
                 wf.connect([
@@ -193,10 +212,8 @@ def run():
     """
     for run_type, runs in buffer_nodes.bold_inputs.items():
         sdc_buffer = pe.Node(
-            niu.IdentityInterface(
-                ["forward_pe', 'reverse_pe"]
-            ),
-            name = f"sdc_buffer_{run_type}",
+            niu.IdentityInterface(["forward_pe', 'reverse_pe"]),
+            name=f"sdc_buffer_{run_type}",
         )
         # Get reverse PE direction
         reverse_run_type = REVERSE_PE_MAPPING[run_type]
@@ -204,7 +221,7 @@ def run():
         boldref_ses = runs[0]
         forward_pe_metadata = wf_manager.bold_runs[run_type][0]
         # Extract boldref
-        session_boldref = init_bold_ref_wf(name = f"session_bold_reference_{run_type}")
+        session_boldref = init_bold_ref_wf(name=f"session_bold_reference_{run_type}")
         # fmt: off
         wf.connect([
             (buffer_nodes.bold[run_type], session_boldref, [(boldref_ses, "inputnode.bold")]),
@@ -221,12 +238,14 @@ def run():
                 (buffer_nodes.fmap[reverse_run_type], sdc_buffer, [(reverse_pe, "reverse_pe")])
             ])
             # fmt: on
-            
-        except Exception as e1:
+
+        except Exception:
             try:
                 reverse_pe = buffer_nodes.bold_inputs[reverse_run_type][0]
                 reverse_pe_metadata = wf_manager.bold_runs[reverse_run_type][0]
-                session_reverse_pe_boldref = init_bold_ref_wf(name = f"session_bold_reference_opposite_pe_{run_type}")
+                session_reverse_pe_boldref = init_bold_ref_wf(
+                    name=f"session_bold_reference_opposite_pe_{run_type}"
+                )
                 # fmt: off
                 wf.connect([
                     (buffer_nodes.bold[reverse_run_type], session_reverse_pe_boldref, [(reverse_pe, "inputnode.bold")]),
@@ -234,13 +253,15 @@ def run():
                 ])
                 # fmt: on
 
-            except Exception as e2:
-                raise ValueError(f"A reverse PE run could not be found [{reverse_run_type}].")
+            except Exception:
+                raise ValueError(
+                    f"A reverse PE run could not be found [{reverse_run_type}]."
+                )
 
         session_sdc = init_bold_sdc_wf(
             forward_pe_metadata,
             reverse_pe_metadata,
-            name = f"session_bold_sdc_{run_type}"
+            name=f"session_bold_sdc_{run_type}",
         )
         # fmt: off
         wf.connect([
@@ -273,13 +294,15 @@ def run():
             # fmt: on
         else:
             reg_bold_to_boldtemplate = init_fsl_bbr_wf(
-                bold2t1w_dof = 6, 
-                use_bbr = False,
-                bold2t1w_init = "register",
+                bold2t1w_dof=6,
+                use_bbr=False,
+                bold2t1w_init="register",
                 omp_nthreads=4,
-                name = f"reg_sdc-bold_to_sdc-boldtemplate_{run_type}",
+                name=f"reg_sdc-bold_to_sdc-boldtemplate_{run_type}",
             )
-            xfm_convert_itk_to_fsl = init_itk_to_fsl_affine_wf(name=f"itk_to_fsl_bold_to_boldtemplate_{run_type}")
+            xfm_convert_itk_to_fsl = init_itk_to_fsl_affine_wf(
+                name=f"itk_to_fsl_bold_to_boldtemplate_{run_type}"
+            )
             # fmt: off
             wf.connect([
                 (buffer_nodes.bold_session_template, reg_bold_to_boldtemplate, [("bold_session_template", "inputnode.t1w_brain")]),
@@ -293,34 +316,54 @@ def run():
 
     # Regrid anat and template
     regrid_template = pe.Node(GenerateSamplingReference(), name="regrid_template")
-    binarize_template = pe.Node(UnaryMaths(operation = 'bin'), name = 'binarize_template')
-    regrid_template_gm = pe.Node(ApplyTransforms(transforms='identity'), name="regrid_template_gm")
-    regrid_template_wm = pe.Node(ApplyTransforms(transforms='identity'), name="regrid_template_wm")
-    regrid_template_csf = pe.Node(ApplyTransforms(transforms='identity'), name="regrid_template_csf")
+    binarize_template = pe.Node(UnaryMaths(operation="bin"), name="binarize_template")
+    regrid_template_gm = pe.Node(
+        ApplyTransforms(transforms="identity"), name="regrid_template_gm"
+    )
+    regrid_template_wm = pe.Node(
+        ApplyTransforms(transforms="identity"), name="regrid_template_wm"
+    )
+    regrid_template_csf = pe.Node(
+        ApplyTransforms(transforms="identity"), name="regrid_template_csf"
+    )
     regrid_t2w = pe.Node(GenerateSamplingReference(), name="regrid_t2w")
     merge_template_tpms = pe.Node(
         Function(
-            input_names = ["input_1", "input_2", "input_3"],
-            output_names = ["output_list"],
-            function = listify_three_inputs
+            input_names=["input_1", "input_2", "input_3"],
+            output_names=["output_list"],
+            function=listify_three_inputs,
         ),
-        name="merge_template_tpms"
+        name="merge_template_tpms",
     )
 
     # Register session bold template to T2w
-    initreg_boldtemplate_to_t2w_boldref = pe.Node(Split(dimension="t", out_base_name="split_bold_"), name="initreg_boldtemplate_to_t2w_boldref")
-    initreg_boldtemplate_to_t2w_hmc = pe.Node(MCFLIRT(save_mats=False, save_plots=False, save_rms=False), name="initreg_boldtemplate_to_t2w_hmc")
-    initreg_boldtemplate_to_t2w_tmean = pe.Node(MeanImage(), name="initreg_boldtemplate_to_t2w_tmean")
-    initreg_boldtemplate_to_t2w_n4 = pe.Node(N4BiasFieldCorrection(), name="initreg_boldtemplate_to_t2w_n4")
-    initreg_boldtemplate_to_t2w_sdc = pe.Node(ApplyWarp(), name="initreg_boldtemplate_to_t2w_warp")
-    reg_boldtemplate_to_t2w = init_fsl_bbr_wf(
-        bold2t1w_dof = 6, 
-        use_bbr = False,
-        bold2t1w_init = "register",
-        omp_nthreads=4,
-        name = f"reg_sdc-boldtemplate_to_t2w_{first_key}",
+    initreg_boldtemplate_to_t2w_boldref = pe.Node(
+        Split(dimension="t", out_base_name="split_bold_"),
+        name="initreg_boldtemplate_to_t2w_boldref",
     )
-    xfm_convert_itk_to_fsl_boldtemplate_to_t2w = init_itk_to_fsl_affine_wf(name=f"itk_to_fsl_boldtemplate_to_t2w")
+    initreg_boldtemplate_to_t2w_hmc = pe.Node(
+        MCFLIRT(save_mats=False, save_plots=False, save_rms=False),
+        name="initreg_boldtemplate_to_t2w_hmc",
+    )
+    initreg_boldtemplate_to_t2w_tmean = pe.Node(
+        MeanImage(), name="initreg_boldtemplate_to_t2w_tmean"
+    )
+    initreg_boldtemplate_to_t2w_n4 = pe.Node(
+        N4BiasFieldCorrection(), name="initreg_boldtemplate_to_t2w_n4"
+    )
+    initreg_boldtemplate_to_t2w_sdc = pe.Node(
+        ApplyWarp(), name="initreg_boldtemplate_to_t2w_warp"
+    )
+    reg_boldtemplate_to_t2w = init_fsl_bbr_wf(
+        bold2t1w_dof=6,
+        use_bbr=False,
+        bold2t1w_init="register",
+        omp_nthreads=4,
+        name=f"reg_sdc-boldtemplate_to_t2w_{first_key}",
+    )
+    xfm_convert_itk_to_fsl_boldtemplate_to_t2w = init_itk_to_fsl_affine_wf(
+        name="itk_to_fsl_boldtemplate_to_t2w"
+    )
 
     session_bold_run_input = buffer_nodes.bold_inputs[first_key][0]
     # fmt: off
@@ -348,34 +391,35 @@ def run():
     # Register T2w to template
     mask_t2w_initreg = pe.Node(
         FLIRT(dof=9),
-        name = "mask_t2w_initreg_template_to_t2w",
+        name="mask_t2w_initreg_template_to_t2w",
     )
-    mask_t2w_genmask = pe.Node(
-        Threshold(thresh=500),
-        name = "mask_t2w_generate_mask"
-    )
-    mask_t2w = pe.Node(
-        ApplyMask(),
-        name = "mask_t2w_apply_mask"
-    )
+    mask_t2w_genmask = pe.Node(Threshold(thresh=500), name="mask_t2w_generate_mask")
+    mask_t2w = pe.Node(ApplyMask(), name="mask_t2w_apply_mask")
     initreg_t2w_to_template = pe.Node(
         FLIRT(
             dof=12,
-            searchr_x = [-180, 180],
-            searchr_y = [-180, 180],
-            searchr_z = [-180, 180],
+            searchr_x=[-180, 180],
+            searchr_y=[-180, 180],
+            searchr_z=[-180, 180],
         ),
-        name = "reg_affine_t2w_to_template"
+        name="reg_affine_t2w_to_template",
     )
     reg_t2w_to_template = pe.Node(
-        RegistrationSynQuick(transform_type = 'sr'),
-        name = "reg_t2w_to_template"
+        RegistrationSynQuick(transform_type="sr"), name="reg_t2w_to_template"
     )
-    xfm_convert_itk_to_fsl_t2w_to_template_affine = init_itk_to_fsl_affine_wf(name=f"itk_to_fsl_t2w_to_template_affine")
-    xfm_convert_itk_to_fsl_t2w_to_template_warp = init_itk_to_fsl_warp_wf(name=f"itk_to_fsl_t2w_to_template_warp")
-    init_xfm_t2w_to_template_affine = pe.Node(ConvertXFM(concat_xfm=True), name="itk_to_fsl_t2w_to_template_mergeaffines")
-    init_xfm_t2w_to_template_warp = pe.Node(ConvertWarp(relwarp=True), name="itk_to_fsl_t2w_to_template_createwarp")
-    apply_t2w_to_template = pe.Node(ApplyWarp(), name=f"trans_t2w_to_template")
+    xfm_convert_itk_to_fsl_t2w_to_template_affine = init_itk_to_fsl_affine_wf(
+        name="itk_to_fsl_t2w_to_template_affine"
+    )
+    xfm_convert_itk_to_fsl_t2w_to_template_warp = init_itk_to_fsl_warp_wf(
+        name="itk_to_fsl_t2w_to_template_warp"
+    )
+    init_xfm_t2w_to_template_affine = pe.Node(
+        ConvertXFM(concat_xfm=True), name="itk_to_fsl_t2w_to_template_mergeaffines"
+    )
+    init_xfm_t2w_to_template_warp = pe.Node(
+        ConvertWarp(relwarp=True), name="itk_to_fsl_t2w_to_template_createwarp"
+    )
+    apply_t2w_to_template = pe.Node(ApplyWarp(), name="trans_t2w_to_template")
     # fmt: off
     wf.connect([
         (rescale_template, regrid_template, [("rescaled_path", "fixed_image")]),
@@ -415,28 +459,34 @@ def run():
     ])
     # fmt: on
 
-    #Process each run
+    # Process each run
     for run_type, _bold_buffer in buffer_nodes.bold.items():
-        
         for bold_ix, bold_input in enumerate(buffer_nodes.bold_inputs[run_type]):
-                
             bold_path = wf_manager.bold_runs[run_type][bold_ix]
             metadata = load_json_as_dict(
-                Path(str(bold_path).replace('.nii.gz', '.json'))
+                Path(str(bold_path).replace(".nii.gz", ".json"))
             )
 
-            boldref = init_bold_ref_wf(name = f"{bold_input}_reference_{run_type}")
-            hmc = pe.Node(MCFLIRT(save_mats=True, save_plots=True, save_rms=True), name=f"{bold_input}_hmc_{run_type}")
-            normalize_motion = pe.Node(NormalizeMotionParams(format="FSL"), name=f"{bold_input}_normalize_motion_{run_type}")
-            reg_bold_to_boldtemplate = init_fsl_bbr_wf(
-                bold2t1w_dof = 6, 
-                use_bbr = False,
-                bold2t1w_init = "register",
-                omp_nthreads=4,
-                name = f"reg_{bold_input}_to_nosdc-boldtemplate_{run_type}",
+            boldref = init_bold_ref_wf(name=f"{bold_input}_reference_{run_type}")
+            hmc = pe.Node(
+                MCFLIRT(save_mats=True, save_plots=True, save_rms=True),
+                name=f"{bold_input}_hmc_{run_type}",
             )
-            xfm_convert_itk_to_fsl = init_itk_to_fsl_affine_wf(name=f"itk_to_fsl_{bold_input}_to_nosdc-boldtemplate_{run_type}")
-        
+            normalize_motion = pe.Node(
+                NormalizeMotionParams(format="FSL"),
+                name=f"{bold_input}_normalize_motion_{run_type}",
+            )
+            reg_bold_to_boldtemplate = init_fsl_bbr_wf(
+                bold2t1w_dof=6,
+                use_bbr=False,
+                bold2t1w_init="register",
+                omp_nthreads=4,
+                name=f"reg_{bold_input}_to_nosdc-boldtemplate_{run_type}",
+            )
+            xfm_convert_itk_to_fsl = init_itk_to_fsl_affine_wf(
+                name=f"itk_to_fsl_{bold_input}_to_nosdc-boldtemplate_{run_type}"
+            )
+
             # fmt: off
             wf.connect([
                 (_bold_buffer, boldref,[(bold_input, "inputnode.bold")]),
@@ -450,24 +500,33 @@ def run():
                 (buffer_nodes.bold_session[run_type], xfm_convert_itk_to_fsl, [("distorted_bold", "inputnode.reference")]),
             ])
             # fmt: on
-            
-            # Merge transforms
-            #1) HMC regs to boldref [run | nosdc] `hmc` [inputs: `mat_file`]
-            #2) reg boldref [run | nosdc] to boldref [session | nosdc] `xfm_convert_itk_to_fsl` [inputs: `fsl_affine`]
-            #3) sdc warp [session] `session_bold_buffer[run_type]` [inputs: `sdc_warp`]
-            #4) reg boldref [session | sdc] to boldref [MAIN - runtype | session | sdc] `session_template_reg_buffer` [inputs: `aff_bold_to_boldtemplate_{run_type}`]
-            #5) reg boldref [MAIN - runtype | session | sdc] to T2w `xfm_convert_itk_to_fsl_boldtemplate_to_t2w` [inputs: `fsl_affine`]
-            #6) reg T2w to ABI template
-            merge_4_5 = pe.Node(ConvertXFM(concat_xfm=True), name=f"merge_xfms_4-5_{bold_input}_{run_type}")
-            merge_2_5 = pe.Node(ConvertWarp(output_type = "NIFTI_GZ", relwarp=True), name = f"merge_xfms_2-5_{bold_input}_{run_type}")
-            merge_2_6 = pe.Node(ConvertWarp(output_type = "NIFTI_GZ", relwarp=True), name = f"merge_xfms_2-6_{bold_input}_{run_type}")
 
-            # Apply 
+            # Merge transforms
+            # 1) HMC regs to boldref [run | nosdc] `hmc` [inputs: `mat_file`]
+            # 2) reg boldref [run | nosdc] to boldref [session | nosdc] `xfm_convert_itk_to_fsl` [inputs: `fsl_affine`]
+            # 3) sdc warp [session] `session_bold_buffer[run_type]` [inputs: `sdc_warp`]
+            # 4) reg boldref [session | sdc] to boldref [MAIN - runtype | session | sdc] `session_template_reg_buffer` [inputs: `aff_bold_to_boldtemplate_{run_type}`]
+            # 5) reg boldref [MAIN - runtype | session | sdc] to T2w `xfm_convert_itk_to_fsl_boldtemplate_to_t2w` [inputs: `fsl_affine`]
+            # 6) reg T2w to ABI template
+            merge_4_5 = pe.Node(
+                ConvertXFM(concat_xfm=True),
+                name=f"merge_xfms_4-5_{bold_input}_{run_type}",
+            )
+            merge_2_5 = pe.Node(
+                ConvertWarp(output_type="NIFTI_GZ", relwarp=True),
+                name=f"merge_xfms_2-5_{bold_input}_{run_type}",
+            )
+            merge_2_6 = pe.Node(
+                ConvertWarp(output_type="NIFTI_GZ", relwarp=True),
+                name=f"merge_xfms_2-6_{bold_input}_{run_type}",
+            )
+
+            # Apply
             apply_bold_to_template = pe.Node(
                 ApplyBoldToAnat(debug=False),
                 name=f"trans_{bold_input}_to_template_{run_type}",
             )
-            
+
             # fmt: off
             wf.connect([
                 (buffer_nodes.bold_session_template_reg, merge_4_5, [(f"bold_session_{run_type}_to_bold_session_template_reg", "in_file")]),
@@ -510,16 +569,15 @@ def run():
             # fmt: on
 
             deriv_outputs = get_source_files(
-                parse_bold_path(bold_path),
-                wf_manager.deriv_dir
+                parse_bold_path(bold_path), wf_manager.deriv_dir
             )
             bold_deriv_wf = init_bold_preproc_derivatives_wf(
                 deriv_outputs,
-                name = f"derivatives_{bold_input}_{run_type}_wf",   
+                name=f"derivatives_{bold_input}_{run_type}_wf",
             )
             reverse_rescaling = pe.Node(
-                RescaleNifti(rescale_factor=1/RESCALE_FACTOR),
-                name=f"reverse_rescale_{bold_input}_{run_type}"
+                RescaleNifti(rescale_factor=1 / RESCALE_FACTOR),
+                name=f"reverse_rescale_{bold_input}_{run_type}",
             )
             # fmt: off
             wf.connect([

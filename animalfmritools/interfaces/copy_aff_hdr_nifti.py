@@ -2,28 +2,31 @@ from nipype.interfaces.base import (
     File,
     SimpleInterface,
     TraitedSpec,
-    traits,
 )
 
 import os
 
 OUTPATH = "copied.nii.gz"
 
-def _CopyAffineHeaderInfo(input_image, reference_image, out_path=OUTPATH):
 
+def _CopyAffineHeaderInfo(input_image, reference_image, out_path=OUTPATH):
     import nibabel as nib
 
     input_img = nib.load(input_image)
     ref_img = nib.load(reference_image)
 
     nib.save(
-        nib.Nifti1Image(input_img.get_fdata(), header=ref_img.header, affine=ref_img.affine),
-        out_path
+        nib.Nifti1Image(
+            input_img.get_fdata(), header=ref_img.header, affine=ref_img.affine
+        ),
+        out_path,
     )
+
 
 class CopyAffineHeaderInfoInputSpec(TraitedSpec):
     input_image = File(exists=True, desc="input_image", mandatory=True)
     reference_image = File(exists=True, desc="reference_image", mandatory=True)
+
 
 class CopyAffineHeaderInfoOutputSpec(TraitedSpec):
     copied_path = File(exists=True, desc="copied nifti path")

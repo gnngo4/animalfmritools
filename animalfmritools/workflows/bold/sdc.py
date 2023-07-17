@@ -6,84 +6,90 @@ from animalfmritools.interfaces.rescale_nifti import RescaleNifti
 
 from pathlib import Path
 
+
 def build_list_with_strings(e1, e2):
-    return [e1,e2]
+    return [e1, e2]
+
 
 def add_string_to_list(in_list, element):
     in_list.append(element)
     return in_list
 
+
 def init_bold_sdc_wf(
     forward_pe_json: Path,
     reverse_pe_json: Path,
-    RESCALE_FACTOR = 0.1,
+    RESCALE_FACTOR=0.1,
     name: str = "bold_sdc_wf",
 ):
-    
     from nipype.interfaces.utility import Function
     from nipype.interfaces.fsl import Merge
     from nipype.interfaces.fsl.utils import Split
     from nipype.interfaces.fsl.maths import BinaryMaths
     from animalfmritools.interfaces.fsl_topup import TOPUPAcqParams, TOPUP
-    
+
     workflow = Workflow(name=name)
-    
+
     inputnode = pe.Node(
-        niu.IdentityInterface(["forward_pe","reverse_pe"]),
-        name = "inputnode",
+        niu.IdentityInterface(["forward_pe", "reverse_pe"]),
+        name="inputnode",
     )
 
     outputnode = pe.Node(
         niu.IdentityInterface(["sdc_warp", "sdc_affine", "sdc_bold"]),
-        name = "outputnode",
+        name="outputnode",
     )
 
-    rescale_fwd_pe = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name = "rescale_fwd_pe")
-    rescale_rev_pe = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name = "rescale_rev_pe")
-	
+    rescale_fwd_pe = pe.Node(
+        RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_fwd_pe"
+    )
+    rescale_rev_pe = pe.Node(
+        RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_rev_pe"
+    )
+
     init_topup_list = pe.Node(
-        interface = Function(
-            input_name = ["e1", "e2"],
-            output_names = ["out_list"],
-            function = build_list_with_strings
+        interface=Function(
+            input_name=["e1", "e2"],
+            output_names=["out_list"],
+            function=build_list_with_strings,
         ),
-        name = "init_topup_list"
+        name="init_topup_list",
     )
 
     init_topup_metadata_list = pe.Node(
-        interface = Function(
-            input_names = ["e1","e2"],
-            output_names = ["out_list"],
-            function = build_list_with_strings
+        interface=Function(
+            input_names=["e1", "e2"],
+            output_names=["out_list"],
+            function=build_list_with_strings,
         ),
-        name = "init_topup_metadata_list"
+        name="init_topup_metadata_list",
     )
     init_topup_metadata_list.inputs.e1 = forward_pe_json
     init_topup_metadata_list.inputs.e2 = reverse_pe_json
 
     topup_merge = pe.Node(
-        Merge(dimension="t", output_type="NIFTI_GZ"),
-        name = "topup_merge"
+        Merge(dimension="t", output_type="NIFTI_GZ"), name="topup_merge"
     )
 
-    topup_get_acqparams = pe.Node(
-        TOPUPAcqParams(),
-        name = "topup_get_acqparams_file"
-    )
+    topup_get_acqparams = pe.Node(TOPUPAcqParams(), name="topup_get_acqparams_file")
 
-    topup = pe.Node(
-        TOPUP(output_type = "NIFTI_GZ"),
-        name = "topup"
-    )
-	
+    topup = pe.Node(TOPUP(output_type="NIFTI_GZ"), name="topup")
+
     topup_split = pe.Node(
-		Split(dimension="t", out_base_name="split_bold_"),
-		name = "topup_split_corrected"
-	)
-    
-    topup_rescale_corrected = pe.Node(RescaleNifti(rescale_factor=1/RESCALE_FACTOR), name = "topup_rescale_corrected")
-    topup_rescale_warp_res = pe.Node(RescaleNifti(rescale_factor=1/RESCALE_FACTOR), name = "topup_rescale_warp_resolution")
-    topup_rescale_warp_mag = pe.Node(BinaryMaths(operand_value=1/RESCALE_FACTOR, operation = "mul"), name = "topup_rescale_warp_magnitude")
+        Split(dimension="t", out_base_name="split_bold_"), name="topup_split_corrected"
+    )
+
+    topup_rescale_corrected = pe.Node(
+        RescaleNifti(rescale_factor=1 / RESCALE_FACTOR), name="topup_rescale_corrected"
+    )
+    topup_rescale_warp_res = pe.Node(
+        RescaleNifti(rescale_factor=1 / RESCALE_FACTOR),
+        name="topup_rescale_warp_resolution",
+    )
+    topup_rescale_warp_mag = pe.Node(
+        BinaryMaths(operand_value=1 / RESCALE_FACTOR, operation="mul"),
+        name="topup_rescale_warp_magnitude",
+    )
 
     # fmt: off
     workflow.connect([
@@ -107,5 +113,6 @@ def init_bold_sdc_wf(
 
     return workflow
 
+
 def _get_split_volume(out_files, vol_idx):
-	return out_files[vol_idx]
+    return out_files[vol_idx]

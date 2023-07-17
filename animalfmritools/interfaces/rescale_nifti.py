@@ -9,22 +9,22 @@ import os
 
 OUTPATH = "rescaled.nii.gz"
 
-def _RescaleNifti(nifti_path, rescale_factor, out_path=OUTPATH):
 
+def _RescaleNifti(nifti_path, rescale_factor, out_path=OUTPATH):
     import numpy as np
     import nibabel as nib
 
-    # Load nifti 
+    # Load nifti
     img = nib.load(nifti_path)
     header = img.header
 
     # create a copy not a view, so it does not change if original changed
-    qformcode = header['qform_code'].copy()
-    sformcode = header['sform_code'].copy()
+    qformcode = header["qform_code"].copy()
+    sformcode = header["sform_code"].copy()
 
     # now to augment the image you need to change both the sform and the qform
     # augmenting pixidm, will change the qform
-    header['pixdim'][1:4] = header['pixdim'][1:4] * rescale_factor
+    header["pixdim"][1:4] = header["pixdim"][1:4] * rescale_factor
 
     # augmenting the affine, will change the sform
     # !!! YOU NEED TO CHANGE THAT BASED ON YOUR ORIENTATION
@@ -33,8 +33,8 @@ def _RescaleNifti(nifti_path, rescale_factor, out_path=OUTPATH):
     img.affine[2][2] = img.affine[2][2] * rescale_factor
 
     # set q and sformcode (does not help) that's why I reimport
-    header['qform_code'] = qformcode
-    header['sform_code'] = sformcode
+    header["qform_code"] = qformcode
+    header["sform_code"] = sformcode
 
     # now, you create a new image using three pieces of info:
     # matrix values, affine matrix, header
@@ -50,8 +50,8 @@ def _RescaleNifti(nifti_path, rescale_factor, out_path=OUTPATH):
     img_aug = nib.load(new_img_abs)
     header_aug = img_aug.header
 
-    header_aug['qform_code'] = qformcode
-    header_aug['sform_code'] = sformcode
+    header_aug["qform_code"] = qformcode
+    header_aug["sform_code"] = sformcode
 
     values_aug = np.array(img_aug.get_fdata())
     new_img_aug = nib.Nifti1Image(values_aug, img_aug.affine, header_aug)

@@ -44,6 +44,7 @@ class C3dAffineTool(CommandLine):
 
         return _outputs
 
+
 class ConvertITKtoFSLWarpInputSpec(CommandLineInputSpec):
     itk_warp = File(argstr="-from-itk %s", position=0, desc="ITK warp")
     fsl_warp = File(argstr="-to-fnirt %s", position=1, desc="FSL warp")

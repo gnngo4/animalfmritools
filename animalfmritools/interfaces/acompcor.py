@@ -5,9 +5,9 @@ from nipype.interfaces.base import (
     OutputMultiObject,
     SimpleInterface,
     TraitedSpec,
-    isdefined,
     traits,
 )
+
 
 def mask2vf(in_file, zooms=None, out_file=None):
     """
@@ -41,6 +41,7 @@ def mask2vf(in_file, zooms=None, out_file=None):
     hdr.set_data_dtype(np.float32)
     nb.Nifti1Image(data.astype(np.float32), img.affine, hdr).to_filename(out_file)
     return out_file
+
 
 def acompcor_masks(in_files, is_aseg=False, zooms=None):
     """
@@ -95,8 +96,6 @@ def acompcor_masks(in_files, is_aseg=False, zooms=None):
 
     import nibabel as nb
     import numpy as np
-    from scipy.ndimage import binary_dilation
-    from skimage.morphology import ball
 
     csf_file = in_files[2]  # BIDS labeling (CSF=2; last of list)
     # Load PV maps (fast) or segments (recon-all)
@@ -111,7 +110,7 @@ def acompcor_masks(in_files, is_aseg=False, zooms=None):
     zooms = np.array(zooms, dtype=float)
 
     if not is_aseg:
-        gm_data = gm_vf.get_fdata() > 0.05
+        gm_vf.get_fdata() > 0.05
         wm_data = wm_vf.get_fdata()
         csf_data = csf_vf.get_fdata()
     else:
@@ -132,34 +131,41 @@ def acompcor_masks(in_files, is_aseg=False, zooms=None):
         gm_data = np.asanyarray(gm_vf.dataobj, np.uint8) == 1
         """
 
-        csf_data = (csf_vf.get_fdata() > .5).astype(int)
-        wm_data = (wm_vf.get_fdata() > .5).astype(int)
-        #gm_data = gm_vf.get_fdata() == 1.
+        csf_data = (csf_vf.get_fdata() > 0.5).astype(int)
+        wm_data = (wm_vf.get_fdata() > 0.5).astype(int)
+        # gm_data = gm_vf.get_fdata() == 1.
 
     # Dilate the GM mask
-    #gm_data = binary_dilation(gm_data, structure=ball(3))
+    # gm_data = binary_dilation(gm_data, structure=ball(3))
 
     # Output filenames
     wm_file = str(Path("acompcor_wm.nii.gz").absolute())
     combined_file = str(Path("acompcor_wmcsf.nii.gz").absolute())
 
     # Prepare WM mask
-    #wm_data[gm_data] = 0  # Make sure voxel does not contain GM
+    # wm_data[gm_data] = 0  # Make sure voxel does not contain GM
     nb.Nifti1Image(wm_data, gm_vf.affine, gm_vf.header).to_filename(wm_file)
 
     # Prepare combined CSF+WM mask
     comb_data = csf_data + wm_data
-    #comb_data[gm_data] = 0  # Make sure voxel does not contain GM
+    # comb_data[gm_data] = 0  # Make sure voxel does not contain GM
     nb.Nifti1Image(comb_data, gm_vf.affine, gm_vf.header).to_filename(combined_file)
     return [csf_file, wm_file, combined_file]
+
 
 class _aCompCorMasksInputSpec(BaseInterfaceInputSpec):
     in_vfs = InputMultiObject(File(exists=True), desc="Input volume fractions.")
     is_aseg = traits.Bool(
-        False, usedefault=True, desc="Whether the input volume fractions come from FS' aseg."
+        False,
+        usedefault=True,
+        desc="Whether the input volume fractions come from FS' aseg.",
     )
     bold_zooms = traits.Tuple(
-        traits.Float, traits.Float, traits.Float, mandatory=True, desc="BOLD series zooms"
+        traits.Float,
+        traits.Float,
+        traits.Float,
+        mandatory=True,
+        desc="BOLD series zooms",
     )
 
 
@@ -176,7 +182,6 @@ class aCompCorMasks(SimpleInterface):
     output_spec = _aCompCorMasksOutputSpec
 
     def _run_interface(self, runtime):
-
         self._results["out_masks"] = acompcor_masks(
             self.inputs.in_vfs,
             self.inputs.is_aseg,

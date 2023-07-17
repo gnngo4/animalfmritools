@@ -2,15 +2,14 @@ from nipype.interfaces.base import (
     File,
     SimpleInterface,
     TraitedSpec,
-    traits,
 )
 
 import os
 
 OUTPATH = "flipped.nii.gz"
 
-def _FlipNifti(nifti_path, out_path=OUTPATH):
 
+def _FlipNifti(nifti_path, out_path=OUTPATH):
     import numpy as np
     import nibabel as nib
 
@@ -20,13 +19,12 @@ def _FlipNifti(nifti_path, out_path=OUTPATH):
     for i in range(3):
         data = np.flip(data, axis=i)
 
-    nib.save(
-        nib.Nifti1Image(data, img.affine),
-        out_path
-    )
+    nib.save(nib.Nifti1Image(data, img.affine), out_path)
+
 
 class FlipNiftiInputSpec(TraitedSpec):
     nifti_path = File(exists=True, desc="nifti path", mandatory=True)
+
 
 class FlipNiftiOutputSpec(TraitedSpec):
     flipped_path = File(exists=True, desc="flipped nifti path")
