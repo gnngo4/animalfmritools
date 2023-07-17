@@ -517,9 +517,14 @@ def run():
                 deriv_outputs,
                 name = f"derivatives_{bold_input}_{run_type}_wf",   
             )
+            reverse_rescaling = pe.Node(
+                RescaleNifti(rescale_factor=1/RESCALE_FACTOR),
+                name=f"reverse_rescale_{bold_input}_{run_type}"
+            )
             # fmt: off
             wf.connect([
-                (apply_bold_to_template, bold_deriv_wf, [("t1_bold_path", "inputnode.bold_preproc")]),
+                (apply_bold_to_template, reverse_rescaling, [("t1_bold_path", "nifti_path")]),
+                (reverse_rescaling, bold_deriv_wf, [("rescaled_path", "inputnode.bold_preproc")]),
                 (bold_confs_wf, bold_deriv_wf, [
                     (("outputnode.confounds_metadata", jsonify), "inputnode.bold_confounds_metadata"),
                     ("outputnode.confounds_file", "inputnode.bold_confounds"),
