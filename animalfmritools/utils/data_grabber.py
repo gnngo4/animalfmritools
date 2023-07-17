@@ -116,7 +116,13 @@ class BidsReader(BidsReaderInput):
         for k, runs in runs_dict.items():
             runs.sort()
 
-        return runs_dict
+        # Remove part-phase of a run
+        filtered_dict = {}
+        for k, runs in runs_dict.items():
+            filtered_list = self._remove_phase_parts(runs)
+            filtered_dict[k] = filtered_list
+
+        return filtered_dict
     
     def get_fmap_runs(
         self,
@@ -144,6 +150,10 @@ class BidsReader(BidsReaderInput):
                 runs.sort()
 
         return runs_dict
+    
+    def _remove_phase_parts(self, bold_list: List[Path]) -> List[Path]:
+
+        return [bold_path for bold_path in bold_list if '_part-phase_' not in str(bold_path)]
     
     def _process_dir(self, entry, prefix: str) -> str:
 
