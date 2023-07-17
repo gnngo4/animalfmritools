@@ -130,18 +130,18 @@ class BidsReader(BidsReaderInput):
 
         runs_dict = deepcopy(PE_DIR_SCHEMA)
         sub_ses_fmap_dir = Path(self.bids_dir) / self._process_dir(sub_id, 'sub') / self._process_dir(ses_id, 'ses') / 'fmap'
-        assert sub_ses_fmap_dir.exists(), f"Directory [{sub_ses_fmap_dir}] does not exist."
+        #assert sub_ses_fmap_dir.exists(), f"Directory [{sub_ses_fmap_dir}] does not exist."
 
-        for i in sub_ses_fmap_dir.iterdir():
-            if not i.is_dir() and i.name.endswith("_epi.nii.gz"):
-                _dir = i.stem.split('_dir-')[-1].split('_')[0]
-                _dir = f"dir-{_dir}"
-                assert _dir in runs_dict.keys(), f"{_dir} is not supported."
-                runs_dict[_dir].append(i)
-
-        # sort
-        for k, runs in runs_dict.items():
-            runs.sort()
+        if sub_ses_fmap_dir.exists():
+            for i in sub_ses_fmap_dir.iterdir():
+                if not i.is_dir() and i.name.endswith("_epi.nii.gz"):
+                    _dir = i.stem.split('_dir-')[-1].split('_')[0]
+                    _dir = f"dir-{_dir}"
+                    assert _dir in runs_dict.keys(), f"{_dir} is not supported."
+                    runs_dict[_dir].append(i)
+            # sort
+            for k, runs in runs_dict.items():
+                runs.sort()
 
         return runs_dict
     

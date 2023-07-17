@@ -7,6 +7,7 @@ from animalfmritools.utils.data_grabber import (
 )
 from animalfmritools.interfaces.apply_bold_to_anat import ApplyBoldToAnat
 from animalfmritools.interfaces.rescale_nifti import RescaleNifti
+from animalfmritools.interfaces.copy_aff_hdr_nifti import CopyAffineHeaderInfo
 from animalfmritools.interfaces.flip_nifti import FlipNifti
 from animalfmritools.interfaces.evenify_nifti import EvenifyNifti
 from animalfmritools.workflows.bold.boldref import init_bold_ref_wf
@@ -87,8 +88,15 @@ def run():
     for run_type, runs in wf_manager.bold_runs.items():
         if PE_DIR_FLIP[run_type]:
             for ix, run_path in enumerate(runs):
+                cp_aff_hdr_info = pe.Node(
+                    CopyAffineHeaderInfo(
+                        input_image = run_path,
+                        reference_image = wf_manager.bold_runs[REVERSE_PE_MAPPING[run_type]][0],
+                    ),
+                    name = f"bold_cp_aff_hdr_{run_type}_{ix}"
+                )
                 flip_nifti = pe.Node(
-                    FlipNifti(nifti = run_path),
+                    FlipNifti(),
                     name = f"bold_flip_{run_type}_{ix}"
                 )
                 evenify_nifti = pe.Node(
@@ -101,6 +109,7 @@ def run():
                 )
                 # fmt: off
                 wf.connect([
+                    (cp_aff_hdr_info, flip_nifti, [("copied_path", "nifti_path")]),
                     (flip_nifti, evenify_nifti, [("flipped_path", "nifti_path")]),
                     (evenify_nifti, rescale_nifti, [("out_path", "nifti_path")]),
                     (rescale_nifti, buffer_nodes.bold[run_type], [("rescaled_path", buffer_nodes.bold_inputs[run_type][ix])]),
@@ -129,9 +138,15 @@ def run():
     for run_type, runs in wf_manager.fmap_runs.items():
         if PE_DIR_FLIP[run_type]:
             for ix, run_path in enumerate(runs):
-                # Flip nifti
+                cp_aff_hdr_info = pe.Node(
+                    CopyAffineHeaderInfo(
+                        input_image = run_path,
+                        reference_image = wf_manager.fmap_runs[REVERSE_PE_MAPPING[run_type]][0],
+                    ),
+                    name = f"fmap_cp_aff_hdr_{run_type}_{ix}"
+                )
                 flip_nifti = pe.Node(
-                    FlipNifti(nifti_path=run_path,), 
+                    FlipNifti(), 
                     name=f"fmap_flip_{run_type}_{ix}"
                 )
                 evenify_nifti = pe.Node(
@@ -144,6 +159,7 @@ def run():
                 )
                 # fmt: off
                 wf.connect([
+                    (cp_aff_hdr_info, flip_nifti, [("copied_path", "nifti_path")]),
                     (flip_nifti, evenify_nifti, [("flipped_path", "nifti_path")]),
                     (evenify_nifti, rescale_nifti, [("out_path", "nifti_path")]),
                     (rescale_nifti, buffer_nodes.fmap[run_type], [("rescaled_path", buffer_nodes.fmap_inputs[run_type][ix])]),
@@ -242,7 +258,6 @@ def run():
     Register all `sdc_bold`  to the first run_type
     """
     first_key = next(iter(buffer_nodes.bold_session))
-    print(first_key)
 
     # fmt: off
     wf.connect([

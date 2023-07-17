@@ -49,4 +49,12 @@ def setup_workflow(
         "template": get_template_data()
     }
 
+    # Verbose; debug
+    """
+    for i, j in data.items():
+        print(i,j)
+
+    import pdb; pdb.set_trace()
+    """
+
     return WorkflowManager(**data)
