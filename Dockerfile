@@ -209,3 +209,5 @@ ADD ["animalfmritools", "/opt/animalfmritools/animalfmritools"]
 RUN ["pipenv", "install", "--deploy", "--system", "--ignore-pipfile"]
 
 WORKDIR /opt
+
+ENTRYPOINT ["python3", "/opt/animalfmritools/animalfmritools/cli/run.py"]
