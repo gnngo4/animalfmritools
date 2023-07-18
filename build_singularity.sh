@@ -1,3 +1,4 @@
+docker build -t animalfmritools .
 docker tag animalfmritools localhost:5000/animalfmritools
 docker push localhost:5000/animalfmritools
 rm animalfmritools.simg
