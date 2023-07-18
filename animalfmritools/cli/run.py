@@ -1,6 +1,11 @@
 import sys
-
 sys.path.insert(1, "/opt/animalfmritools")
+
+import os
+import certifi
+os.environ["REQUESTS_CA_BUNDLE"] = os.path.join(
+    os.path.dirname(sys.argv[0]), certifi.where()
+)
 
 from pathlib import Path
 
