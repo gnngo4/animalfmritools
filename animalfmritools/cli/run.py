@@ -68,7 +68,7 @@ def run():
     wf_manager = setup_workflow(
         args.subject_id, args.session_id, args.bids_dir, args.out_dir, args.scratch_dir
     )
-
+    
     # Instantiate workflow
     wf = Workflow(
         name=f"animalfmritools_sub-{wf_manager.sub_id}_ses-{wf_manager.ses_id}",
@@ -113,7 +113,7 @@ def run():
     Rescale bold runs
     """
     for run_type, runs in wf_manager.bold_runs.items():
-        if PE_DIR_FLIP[run_type]:
+        if PE_DIR_FLIP[run_type] and len(runs) > 0:
             for ix, run_path in enumerate(runs):
                 cp_aff_hdr_info = pe.Node(
                     CopyAffineHeaderInfo(
@@ -161,12 +161,12 @@ def run():
     Rescale fmap runs
     """
     for run_type, runs in wf_manager.fmap_runs.items():
-        if PE_DIR_FLIP[run_type]:
+        if PE_DIR_FLIP[run_type] and len(runs) > 0:
             for ix, run_path in enumerate(runs):
                 cp_aff_hdr_info = pe.Node(
                     CopyAffineHeaderInfo(
                         input_image=run_path,
-                        reference_image=wf_manager.fmap_runs[
+                        reference_image=wf_manager.bold_runs[
                             REVERSE_PE_MAPPING[run_type]
                         ][0],
                     ),
