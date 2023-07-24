@@ -58,6 +58,7 @@ from workflow_utils import setup_buffer_nodes
 RESCALE_FACTOR = (
     10  # Scale voxel sizes by 10 so that some neuroimaging tools will work for animals
 )
+TEMPLATE_THRESHOLDING = 5
 
 
 def run():
@@ -66,7 +67,11 @@ def run():
 
     # Subject info
     wf_manager = setup_workflow(
-        args.subject_id, args.session_id, args.bids_dir, args.out_dir, args.scratch_dir
+        args.subject_id, 
+        args.session_id, 
+        args.bids_dir, 
+        args.out_dir, 
+        args.scratch_dir
     )
     
     # Instantiate workflow
@@ -398,7 +403,7 @@ def run():
         FLIRT(dof=9),
         name="mask_t2w_initreg_template_to_t2w",
     )
-    mask_t2w_genmask = pe.Node(Threshold(thresh=500), name="mask_t2w_generate_mask")
+    mask_t2w_genmask = pe.Node(Threshold(thresh=TEMPLATE_THRESHOLDING), name="mask_t2w_generate_mask")
     mask_t2w = pe.Node(ApplyMask(), name="mask_t2w_apply_mask")
     initreg_t2w_to_template = pe.Node(
         FLIRT(
@@ -528,7 +533,7 @@ def run():
 
             # Apply
             apply_bold_to_template = pe.Node(
-                ApplyBoldToAnat(debug=False),
+                ApplyBoldToAnat(debug=args.reg_quick),
                 name=f"trans_{bold_input}_to_template_{run_type}",
             )
 

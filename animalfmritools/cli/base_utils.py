@@ -5,8 +5,10 @@ from pathlib import Path
 
 from animalfmritools.utils.data_grabber import BidsReader
 
-DATADIR = Path("/opt/animalfmritools/animalfmritools/data")
-
+#DATADIR = Path("/opt/animalfmritools/animalfmritools/data")
+TEMPLATE_DIR = {
+    "Mouse_ABA": Path("/opt/animalfmritools/animalfmritools/data_template/MouseABA"),
+}
 
 class WorkflowManager(BaseModel):
     sub_id: str
@@ -20,12 +22,12 @@ class WorkflowManager(BaseModel):
     template: Dict[str, Path]
 
 
-def get_template_data(base_dir: Path = DATADIR) -> Dict[str, Path]:
+def get_template_data(base_dir: Path = TEMPLATE_DIR['Mouse_ABA']) -> Dict[str, Path]:
     return {
-        "Base": base_dir / "TMBTA_Brain_Template.nii.gz",
-        "CSF": base_dir / "TMBTA_Ventricles.nii.gz",
-        "Grey": base_dir / "TMBTA_Grey.nii.gz",
-        "White": base_dir / "TMBTA_White_eroF.nii.gz",
+        "Base": base_dir / "TMBTA_space-P56_downsample2.nii.gz",
+        "CSF": base_dir / "rois" / "pipeline_vs.nii.gz",
+        "Grey": base_dir / "rois" / "pipeline_gm.nii.gz",
+        "White": base_dir / "rois" / "pipeline_wm.nii.gz",
     }
 
 
