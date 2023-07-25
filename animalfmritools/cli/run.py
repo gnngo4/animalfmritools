@@ -33,7 +33,7 @@ from nipype.interfaces import utility as niu
 from nipype.interfaces.utility import Function
 from nipype.interfaces.fsl import MCFLIRT, FLIRT, ApplyWarp, ConvertXFM, ConvertWarp
 from nipype.interfaces.fsl.maths import Threshold, ApplyMask, MeanImage, UnaryMaths
-from nipype.interfaces.fsl.utils import Split
+from nipype.interfaces.fsl.utils import Split, Reorient2Std
 from nipype.interfaces.ants import (
     N4BiasFieldCorrection,
     RegistrationSynQuick,
@@ -86,6 +86,9 @@ def run():
     """
     Rescale anat and template
     """
+    reorient_anat = pe.Node(
+        Reorient2Std(), name=f"reorient_anat"
+    )
     rescale_anat = pe.Node(
         RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_anat"
     )
@@ -105,7 +108,8 @@ def run():
 
     # fmt: off
     wf.connect([
-        (buffer_nodes.anat, rescale_anat, [("t2w", "nifti_path")]),
+        (buffer_nodes.anat, reorient_anat, [("t2w", "in_file")]),
+        (reorient_anat, rescale_anat, [("out_file", "nifti_path")]),
         (rescale_anat, n4_anat, [("rescaled_path", "input_image")]),
         (buffer_nodes.template, rescale_template, [("template", "nifti_path")]),
         (buffer_nodes.template, rescale_template_gm, [("gm", "nifti_path")]),
@@ -118,98 +122,48 @@ def run():
     Rescale bold runs
     """
     for run_type, runs in wf_manager.bold_runs.items():
-        if PE_DIR_FLIP[run_type] and len(runs) > 0:
-            for ix, run_path in enumerate(runs):
-                cp_aff_hdr_info = pe.Node(
-                    CopyAffineHeaderInfo(
-                        input_image=run_path,
-                        reference_image=wf_manager.bold_runs[
-                            REVERSE_PE_MAPPING[run_type]
-                        ][0],
-                    ),
-                    name=f"bold_cp_aff_hdr_{run_type}_{ix}",
-                )
-                flip_nifti = pe.Node(FlipNifti(), name=f"bold_flip_{run_type}_{ix}")
-                evenify_nifti = pe.Node(
-                    EvenifyNifti(), name=f"bold_evenify_{run_type}_{ix}"
-                )
-                rescale_nifti = pe.Node(
-                    RescaleNifti(rescale_factor=RESCALE_FACTOR),
-                    name=f"bold_rescale_{run_type}_{ix}",
-                )
-                # fmt: off
-                wf.connect([
-                    (cp_aff_hdr_info, flip_nifti, [("copied_path", "nifti_path")]),
-                    (flip_nifti, evenify_nifti, [("flipped_path", "nifti_path")]),
-                    (evenify_nifti, rescale_nifti, [("out_path", "nifti_path")]),
-                    (rescale_nifti, buffer_nodes.bold[run_type], [("rescaled_path", buffer_nodes.bold_inputs[run_type][ix])]),
-                ])
-                # fmt: on
-        else:
-            for ix, run_path in enumerate(runs):
-                evenify_nifti = pe.Node(
-                    EvenifyNifti(nifti_path=run_path),
-                    name=f"bold_evenify_{run_type}_{ix}",
-                )
-                rescale_nifti = pe.Node(
-                    RescaleNifti(rescale_factor=10),
-                    name=f"bold_rescale_{run_type}_{ix}",
-                )
-                # fmt: off
-                wf.connect([
-                    (evenify_nifti, rescale_nifti, [("out_path", "nifti_path")]),
-                    (rescale_nifti, buffer_nodes.bold[run_type], [("rescaled_path", buffer_nodes.bold_inputs[run_type][ix])]),
-                ])
-                # fmt: on
+        for ix, run_path in enumerate(runs):
+            reorient_nifti = pe.Node(
+                Reorient2Std(in_file=run_path), name=f"bold_reorient_{run_type}_{ix}"
+            )
+            evenify_nifti = pe.Node(
+                EvenifyNifti(), name=f"bold_evenify_{run_type}_{ix}"
+            )
+            rescale_nifti = pe.Node(
+                RescaleNifti(rescale_factor=RESCALE_FACTOR),
+                name=f"bold_rescale_{run_type}_{ix}",
+            )
+            # fmt: off
+            wf.connect([
+                (reorient_nifti, evenify_nifti, [("out_file", "nifti_path")]),
+                (evenify_nifti, rescale_nifti, [("out_path", "nifti_path")]),
+                (rescale_nifti, buffer_nodes.bold[run_type], [("rescaled_path", buffer_nodes.bold_inputs[run_type][ix])]),
+            ])
+            # fmt: on
 
     """
     Rescale fmap runs
     """
     for run_type, runs in wf_manager.fmap_runs.items():
-        if PE_DIR_FLIP[run_type] and len(runs) > 0:
-            for ix, run_path in enumerate(runs):
-                cp_aff_hdr_info = pe.Node(
-                    CopyAffineHeaderInfo(
-                        input_image=run_path,
-                        reference_image=wf_manager.bold_runs[
-                            REVERSE_PE_MAPPING[run_type]
-                        ][0],
-                    ),
-                    name=f"fmap_cp_aff_hdr_{run_type}_{ix}",
-                )
-                flip_nifti = pe.Node(FlipNifti(), name=f"fmap_flip_{run_type}_{ix}")
-                evenify_nifti = pe.Node(
-                    EvenifyNifti(),
-                    name=f"fmap_evenify_{run_type}_{ix}",
-                )
-                rescale_nifti = pe.Node(
-                    RescaleNifti(rescale_factor=RESCALE_FACTOR),
-                    name=f"fmap_rescale_{run_type}_{ix}",
-                )
-                # fmt: off
-                wf.connect([
-                    (cp_aff_hdr_info, flip_nifti, [("copied_path", "nifti_path")]),
-                    (flip_nifti, evenify_nifti, [("flipped_path", "nifti_path")]),
-                    (evenify_nifti, rescale_nifti, [("out_path", "nifti_path")]),
-                    (rescale_nifti, buffer_nodes.fmap[run_type], [("rescaled_path", buffer_nodes.fmap_inputs[run_type][ix])]),
-                ])
-                # fmt: on
-        else:
-            for ix, run_path in enumerate(runs):
-                evenify_nifti = pe.Node(
-                    EvenifyNifti(nifti_path=run_path),
-                    name=f"fmap_evenify_{run_type}_{ix}",
-                )
-                rescale_nifti = pe.Node(
-                    RescaleNifti(rescale_factor=10),
-                    name=f"fmap_rescale_{run_type}_{ix}",
-                )
-                # fmt: off
-                wf.connect([
-                    (evenify_nifti, rescale_nifti, [("out_path", "nifti_path")]),
-                    (rescale_nifti, buffer_nodes.fmap[run_type], [("rescaled_path", buffer_nodes.fmap_inputs[run_type][ix])]),
-                ])
-                # fmt: on
+        for ix, run_path in enumerate(runs):
+            reorient_nifti = pe.Node(
+                Reorient2Std(in_file=run_path), name=f"fmap_reorient_{run_type}_{ix}"
+            )
+            evenify_nifti = pe.Node(
+                EvenifyNifti(),
+                name=f"fmap_evenify_{run_type}_{ix}",
+            )
+            rescale_nifti = pe.Node(
+                RescaleNifti(rescale_factor=RESCALE_FACTOR),
+                name=f"fmap_rescale_{run_type}_{ix}",
+            )
+            # fmt: off
+            wf.connect([
+                (reorient_nifti, evenify_nifti, [("out_file", "nifti_path")]),
+                (evenify_nifti, rescale_nifti, [("out_path", "nifti_path")]),
+                (rescale_nifti, buffer_nodes.fmap[run_type], [("rescaled_path", buffer_nodes.fmap_inputs[run_type][ix])]),
+            ])
+            # fmt: on
 
     """
     Set-up bold template (one template per PE-direction [run_type])

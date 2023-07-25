@@ -16,6 +16,7 @@ pandas = "*"
 matplotlib = "*"
 nipype = "*"
 pydantic = "*"
+fslpy = "*"
 
 [dev-packages]
 ruff = "*"

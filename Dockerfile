@@ -95,13 +95,13 @@ RUN apt-get update -y && apt upgrade -y && \
     --exclude "fsl/etc/matlab" \
     --exclude "fsl/extras" \
     --exclude "fsl/include" \
-    --exclude "fsl/python" \
     --exclude "fsl/refdoc" \
     --exclude "fsl/src" \
     --exclude "fsl/tcl" \
     --exclude "fsl/bin/FSLeyes" \
     && find /opt/fsl-6.0.5.1/bin -type f -not \( \
         -name "applywarp" -or \
+        -name "avscale" -or \
         -name "bet" -or \
         -name "bet2" -or \
         -name "convert_xfm" -or \
@@ -114,9 +114,12 @@ RUN apt-get update -y && apt upgrade -y && \
         -name "fslinfo" -or \
         -name "fslmaths" -or \
         -name "fslmerge" -or \
+        -name "fslreorient2std" -or \
         -name "fslroi" -or \
         -name "fslsplit" -or \
         -name "fslstats" -or \
+        -name "fslswapdim" -or \
+        -name "fslswapdim_exe" -or \
         -name "fslval" -or \
         -name "fugue" -or \
         -name "imtest" -or \
@@ -126,6 +129,7 @@ RUN apt-get update -y && apt upgrade -y && \
         -name "remove_ext" -or \
         -name "susan" -or \
         -name "applytopup" -or \
+        -name "tmpnam" -or \
         -name "topup" -or \
         -name "zeropad" \) -delete \
     && find /opt/fsl-6.0.5.1/data/standard -type f -not -name "MNI152_T1_2mm_brain.nii.gz" -delete
@@ -138,6 +142,7 @@ ENV FSLDIR="/opt/fsl-6.0.5.1" \
     FSLREMOTECALL="" \
     FSLGECUDAQ="cuda.q" \
     LD_LIBRARY_PATH="/opt/fsl-6.0.5.1/lib:$LD_LIBRARY_PATH"
+COPY docker/bin/imcp /opt/fsl-6.0.5.1/bin/imcp
 
 # Convert3D (neurodocker build)
 RUN echo "Downloading Convert3D ..." \
