@@ -186,11 +186,13 @@ def run():
         forward_pe_metadata = wf_manager.bold_runs[run_type][0]
         # Extract boldref
         session_boldref = init_bold_ref_wf(name=f"session_bold_reference_{run_type}")
+        n4_session_boldref = pe.Node(N4BiasFieldCorrection(), name=f"n4_session_bold_reference_{run_type}")
         # fmt: off
         wf.connect([
             (buffer_nodes.bold[run_type], session_boldref, [(boldref_ses, "inputnode.bold")]),
             (session_boldref, sdc_buffer, [("outputnode.boldref", "forward_pe")]),
-            (session_boldref, buffer_nodes.bold_session[run_type], [("outputnode.boldref", "distorted_bold")]),
+            (session_boldref, n4_session_boldref, [("outputnode.boldref", "input_image")]),
+            (n4_session_boldref, buffer_nodes.bold_session[run_type], [("output_image", "distorted_bold")]),
         ])
         # fmt: on
         # Get boldref (reverse PE direction)
@@ -432,6 +434,7 @@ def run():
             )
 
             boldref = init_bold_ref_wf(name=f"{bold_input}_reference_{run_type}")
+            n4_boldref = pe.Node(N4BiasFieldCorrection(), name=f"{bold_input}_n4_reference_{run_type}")
             hmc = pe.Node(
                 MCFLIRT(save_mats=True, save_plots=True, save_rms=True),
                 name=f"{bold_input}_hmc_{run_type}",
@@ -457,10 +460,11 @@ def run():
                 (_bold_buffer, hmc,[(bold_input, "in_file")]),
                 (boldref, hmc,[("outputnode.boldref", "ref_file")]),
                 (hmc, normalize_motion,[("par_file", "in_file")]), # NOTE: par_file are rescaled by a factor of 10 due to the `rescale_bold` step
-                (boldref, reg_bold_to_boldtemplate, [("outputnode.boldref", "inputnode.in_file")]),
+                (boldref, n4_boldref, [("outputnode.boldref", "input_image")]),
+                (n4_boldref, reg_bold_to_boldtemplate, [("output_image", "inputnode.in_file")]),
                 (buffer_nodes.bold_session[run_type], reg_bold_to_boldtemplate, [("distorted_bold", "inputnode.t1w_brain")]),
                 (reg_bold_to_boldtemplate, xfm_convert_itk_to_fsl, [("outputnode.itk_bold_to_t1", "inputnode.itk_affine")]),
-                (boldref, xfm_convert_itk_to_fsl, [("outputnode.boldref", "inputnode.source")]),
+                (n4_boldref, xfm_convert_itk_to_fsl, [("output_image", "inputnode.source")]),
                 (buffer_nodes.bold_session[run_type], xfm_convert_itk_to_fsl, [("distorted_bold", "inputnode.reference")]),
             ])
             # fmt: on
