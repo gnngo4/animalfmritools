@@ -356,7 +356,12 @@ def run():
 
     # Register T2w to template
     mask_t2w_initreg = pe.Node(
-        FLIRT(dof=9),
+        FLIRT(
+            dof=6,
+            searchr_x=[-180, 180],
+            searchr_y=[-180, 180],
+            searchr_z=[-180, 180],
+        ),
         name="mask_t2w_initreg_template_to_t2w",
     )
     mask_t2w_genmask = pe.Node(Threshold(thresh=TEMPLATE_THRESHOLDING), name="mask_t2w_generate_mask")
