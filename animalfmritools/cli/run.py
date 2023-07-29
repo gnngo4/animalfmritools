@@ -301,59 +301,7 @@ def run():
         ),
         name="merge_template_tpms",
     )
-
-    # Register session bold template to T2w
-    initreg_boldtemplate_to_t2w_boldref = pe.Node(
-        Split(dimension="t", out_base_name="split_bold_"),
-        name="initreg_boldtemplate_to_t2w_boldref",
-    )
-    initreg_boldtemplate_to_t2w_hmc = pe.Node(
-        MCFLIRT(save_mats=False, save_plots=False, save_rms=False),
-        name="initreg_boldtemplate_to_t2w_hmc",
-    )
-    initreg_boldtemplate_to_t2w_tmean = pe.Node(
-        MeanImage(), name="initreg_boldtemplate_to_t2w_tmean"
-    )
-    initreg_boldtemplate_to_t2w_n4 = pe.Node(
-        N4BiasFieldCorrection(), name="initreg_boldtemplate_to_t2w_n4"
-    )
-    initreg_boldtemplate_to_t2w_sdc = pe.Node(
-        ApplyWarp(), name="initreg_boldtemplate_to_t2w_warp"
-    )
-    reg_boldtemplate_to_t2w = init_fsl_bbr_wf(
-        bold2t1w_dof=6,
-        use_bbr=False,
-        bold2t1w_init="register",
-        omp_nthreads=4,
-        name=f"reg_sdc-boldtemplate_to_t2w_{first_key}",
-    )
-    xfm_convert_itk_to_fsl_boldtemplate_to_t2w = init_itk_to_fsl_affine_wf(
-        name="itk_to_fsl_boldtemplate_to_t2w"
-    )
-
-    session_bold_run_input = buffer_nodes.bold_inputs[first_key][0]
-    # fmt: off
-    wf.connect([
-        (buffer_nodes.bold[first_key], initreg_boldtemplate_to_t2w_hmc, [(session_bold_run_input, "in_file")]),
-        (buffer_nodes.bold[first_key], initreg_boldtemplate_to_t2w_boldref, [(session_bold_run_input, "in_file")]),
-        (initreg_boldtemplate_to_t2w_boldref, initreg_boldtemplate_to_t2w_hmc, [(("out_files", get_split_volume, 0), "ref_file")]),
-        (initreg_boldtemplate_to_t2w_hmc, initreg_boldtemplate_to_t2w_tmean, [("out_file", "in_file")]),
-        (initreg_boldtemplate_to_t2w_tmean, initreg_boldtemplate_to_t2w_n4, [("out_file", "input_image")]),
-        (initreg_boldtemplate_to_t2w_n4, initreg_boldtemplate_to_t2w_sdc, [
-            ("output_image", "in_file"),
-            ("output_image", "ref_file"),
-        ]),
-        (buffer_nodes.bold_session[first_key], initreg_boldtemplate_to_t2w_sdc, [("sdc_warp", "field_file")]),
-        (n4_anat, regrid_t2w, [("output_image", "fixed_image")]),
-        (buffer_nodes.bold_session_template, regrid_t2w, [("bold_session_template", "moving_image")]),
-        (initreg_boldtemplate_to_t2w_sdc, reg_boldtemplate_to_t2w, [("out_file", "inputnode.in_file")]),
-        (regrid_t2w, reg_boldtemplate_to_t2w, [("out_file", "inputnode.t1w_brain")]),
-        (reg_boldtemplate_to_t2w, xfm_convert_itk_to_fsl_boldtemplate_to_t2w, [("outputnode.itk_bold_to_t1", "inputnode.itk_affine")]),
-        (initreg_boldtemplate_to_t2w_sdc, xfm_convert_itk_to_fsl_boldtemplate_to_t2w, [("out_file", "inputnode.source")]),
-        (regrid_t2w, xfm_convert_itk_to_fsl_boldtemplate_to_t2w, [("out_file", "inputnode.reference")]),
-    ])
-    # fmt: on
-
+    
     # Register T2w to template
     mask_t2w_initreg = pe.Node(
         FLIRT(
@@ -393,6 +341,7 @@ def run():
     apply_t2w_to_template = pe.Node(ApplyWarp(), name="trans_t2w_to_template")
     # fmt: off
     wf.connect([
+        (n4_anat, regrid_t2w, [("output_image", "fixed_image")]),
         (rescale_template, regrid_template, [("rescaled_path", "fixed_image")]),
         (buffer_nodes.bold_session_template, regrid_template, [("bold_session_template", "moving_image")]),
         (regrid_template, mask_t2w_initreg, [("out_file", "in_file")]),
@@ -430,9 +379,73 @@ def run():
     ])
     # fmt: on
 
+    # Register session bold template to T2w
+    initreg_boldtemplate_to_t2w_boldref = pe.Node(
+        Split(dimension="t", out_base_name="split_bold_"),
+        name="initreg_boldtemplate_to_t2w_boldref",
+    )
+    initreg_boldtemplate_to_t2w_hmc = pe.Node(
+        MCFLIRT(save_mats=False, save_plots=False, save_rms=False),
+        name="initreg_boldtemplate_to_t2w_hmc",
+    )
+    initreg_boldtemplate_to_t2w_tmean = pe.Node(
+        MeanImage(), name="initreg_boldtemplate_to_t2w_tmean"
+    )
+    initreg_boldtemplate_to_t2w_n4 = pe.Node(
+        N4BiasFieldCorrection(), name="initreg_boldtemplate_to_t2w_n4"
+    )
+    initreg_boldtemplate_to_t2w_sdc = pe.Node(
+        ApplyWarp(), name="initreg_boldtemplate_to_t2w_warp"
+    )
+    mask_boldtemplate_initreg = pe.Node(
+        FLIRT(dof=6),
+        name="mask_boldtemplate_initreg_boldtemplate_to_t2w",
+    )
+    mask_boldtemplate_genmask = pe.Node(Threshold(thresh=0), name="mask_boldtemplate_generate_mask")
+    mask_boldtemplate = pe.Node(ApplyMask(), name="mask_boldtemplate_apply_mask")
+    reg_boldtemplate_to_t2w = init_fsl_bbr_wf(
+        bold2t1w_dof=6,
+        use_bbr=False,
+        bold2t1w_init="register",
+        omp_nthreads=4,
+        name=f"reg_sdc-boldtemplate_to_t2w_{first_key}",
+    )
+    xfm_convert_itk_to_fsl_boldtemplate_to_t2w = init_itk_to_fsl_affine_wf(
+        name="itk_to_fsl_boldtemplate_to_t2w"
+    )
+
+    session_bold_run_input = buffer_nodes.bold_inputs[first_key][0]
+    # fmt: off
+    wf.connect([
+        (buffer_nodes.bold[first_key], initreg_boldtemplate_to_t2w_hmc, [(session_bold_run_input, "in_file")]),
+        (buffer_nodes.bold[first_key], initreg_boldtemplate_to_t2w_boldref, [(session_bold_run_input, "in_file")]),
+        (initreg_boldtemplate_to_t2w_boldref, initreg_boldtemplate_to_t2w_hmc, [(("out_files", get_split_volume, 0), "ref_file")]),
+        (initreg_boldtemplate_to_t2w_hmc, initreg_boldtemplate_to_t2w_tmean, [("out_file", "in_file")]),
+        (initreg_boldtemplate_to_t2w_tmean, initreg_boldtemplate_to_t2w_n4, [("out_file", "input_image")]),
+        (initreg_boldtemplate_to_t2w_n4, initreg_boldtemplate_to_t2w_sdc, [
+            ("output_image", "in_file"),
+            ("output_image", "ref_file"),
+        ]),
+        (buffer_nodes.bold_session[first_key], initreg_boldtemplate_to_t2w_sdc, [("sdc_warp", "field_file")]),
+        (buffer_nodes.bold_session_template, regrid_t2w, [("bold_session_template", "moving_image")]),
+        (mask_t2w, mask_boldtemplate_initreg, [("out_file", "in_file")]),
+        (initreg_boldtemplate_to_t2w_sdc, mask_boldtemplate_initreg, [("out_file", "reference")]),
+        (mask_boldtemplate_initreg, mask_boldtemplate_genmask, [("out_file", "in_file")]),
+        (mask_boldtemplate_genmask, mask_boldtemplate, [("out_file", "mask_file")]),
+        (initreg_boldtemplate_to_t2w_sdc, mask_boldtemplate, [("out_file", "in_file")]),
+        (mask_boldtemplate, reg_boldtemplate_to_t2w, [("out_file", "inputnode.in_file")]),
+        (mask_t2w, reg_boldtemplate_to_t2w, [("out_file", "inputnode.t1w_brain")]),
+        (reg_boldtemplate_to_t2w, xfm_convert_itk_to_fsl_boldtemplate_to_t2w, [("outputnode.itk_bold_to_t1", "inputnode.itk_affine")]),
+        (initreg_boldtemplate_to_t2w_sdc, xfm_convert_itk_to_fsl_boldtemplate_to_t2w, [("out_file", "inputnode.source")]),
+        (regrid_t2w, xfm_convert_itk_to_fsl_boldtemplate_to_t2w, [("out_file", "inputnode.reference")]),
+    ])
+    # fmt: on
+
     # Process each run
     for run_type, _bold_buffer in buffer_nodes.bold.items():
         for bold_ix, bold_input in enumerate(buffer_nodes.bold_inputs[run_type]):
+            if bold_ix > 0:
+                continue
             bold_path = wf_manager.bold_runs[run_type][bold_ix]
             metadata = load_json_as_dict(
                 Path(str(bold_path).replace(".nii.gz", ".json"))
