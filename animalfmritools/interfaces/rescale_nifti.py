@@ -1,3 +1,5 @@
+import os
+
 from nipype.interfaces.base import (
     File,
     SimpleInterface,
@@ -5,14 +7,12 @@ from nipype.interfaces.base import (
     traits,
 )
 
-import os
-
 OUTPATH = "rescaled.nii.gz"
 
 
 def _RescaleNifti(nifti_path, rescale_factor, out_path=OUTPATH):
-    import numpy as np
     import nibabel as nib
+    import numpy as np
 
     # Load nifti
     img = nib.load(nifti_path)

@@ -1,3 +1,5 @@
+import os
+
 from nipype.interfaces.base import (
     CommandLine,
     CommandLineInputSpec,
@@ -5,8 +7,6 @@ from nipype.interfaces.base import (
     TraitedSpec,
     traits,
 )
-
-import os
 
 
 class C3dAffineToolInputSpec(CommandLineInputSpec):

@@ -110,7 +110,6 @@ def acompcor_masks(in_files, is_aseg=False, zooms=None):
     zooms = np.array(zooms, dtype=float)
 
     if not is_aseg:
-        gm_vf.get_fdata() > 0.05
         wm_data = wm_vf.get_fdata()
         csf_data = csf_vf.get_fdata()
     else:
@@ -170,9 +169,7 @@ class _aCompCorMasksInputSpec(BaseInterfaceInputSpec):
 
 
 class _aCompCorMasksOutputSpec(TraitedSpec):
-    out_masks = OutputMultiObject(
-        File(exists=True), desc="CSF, WM and combined masks, respectively"
-    )
+    out_masks = OutputMultiObject(File(exists=True), desc="CSF, WM and combined masks, respectively")
 
 
 class aCompCorMasks(SimpleInterface):

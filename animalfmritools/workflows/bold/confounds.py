@@ -1,12 +1,11 @@
-from nipype.algorithms import confounds as nac
-from nipype.interfaces import utility as niu
-from nipype.pipeline import engine as pe
-
 from fmriprep.interfaces.confounds import (
     FilterDropped,
     GatherConfounds,
     RenameACompCor,
 )
+from nipype.algorithms import confounds as nac
+from nipype.interfaces import utility as niu
+from nipype.pipeline import engine as pe
 
 
 def init_bold_confs_wf(
@@ -419,9 +418,7 @@ the edge of the brain, as proposed by [@patriat_improved_2017].
         name="merge_confound_metadata",
         run_without_submitting=True,
     )
-    mrg_conf_metadata.inputs.in3 = {
-        label: {"Method": "Mean"} for label in signals_class_labels
-    }
+    mrg_conf_metadata.inputs.in3 = {label: {"Method": "Mean"} for label in signals_class_labels}
     mrg_conf_metadata2 = pe.Node(
         DictMerge(),
         name="merge_confound_metadata2",

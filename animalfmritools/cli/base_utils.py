@@ -1,14 +1,15 @@
-from pydantic import BaseModel
-
-from typing import Dict, List
 from pathlib import Path
+from typing import Dict, List
+
+from pydantic import BaseModel
 
 from animalfmritools.utils.data_grabber import BidsReader
 
-#DATADIR = Path("/opt/animalfmritools/animalfmritools/data")
+# DATADIR = Path("/opt/animalfmritools/animalfmritools/data")
 TEMPLATE_DIR = {
     "Mouse_ABA": Path("/opt/animalfmritools/animalfmritools/data_template/MouseABA"),
 }
+
 
 class WorkflowManager(BaseModel):
     sub_id: str

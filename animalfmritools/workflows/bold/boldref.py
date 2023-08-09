@@ -1,7 +1,7 @@
 from nipype.interfaces import utility as niu
+from nipype.interfaces.fsl.utils import Split
 from nipype.pipeline import engine as pe
 from niworkflows.engine.workflows import LiterateWorkflow as Workflow
-from nipype.interfaces.fsl.utils import Split
 
 
 def init_bold_ref_wf(
@@ -20,9 +20,7 @@ def init_bold_ref_wf(
         name="outputnode",
     )
 
-    split_bold = pe.Node(
-        Split(dimension="t", out_base_name="split_bold_"), name="split_bold"
-    )
+    split_bold = pe.Node(Split(dimension="t", out_base_name="split_bold_"), name="split_bold")
 
     workflow.connect(
         [

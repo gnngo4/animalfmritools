@@ -1,12 +1,11 @@
-from base_utils import WorkflowManager
-
-from animalfmritools.utils.data_grabber import PE_DIR_FLIP
-
-from typing import Dict, List, Tuple
 from pathlib import Path
+from typing import Dict, List, Tuple
 
+from base_utils import WorkflowManager
 from nipype.interfaces import utility as niu
 from nipype.pipeline import engine as pe
+
+from animalfmritools.utils.data_grabber import PE_DIR_FLIP
 
 
 class BufferNodes:
@@ -43,9 +42,7 @@ def get_run_level_buffer_nodes(
             continue
         assert run_type in PE_DIR_FLIP.keys(), f"{run_type} not found."
 
-        buffer_fieldnames = [
-            f"{image_type}_run_{str(ix).zfill(4)}" for ix in range(n_runs)
-        ]
+        buffer_fieldnames = [f"{image_type}_run_{str(ix).zfill(4)}" for ix in range(n_runs)]
         buffer_inputs[run_type] = buffer_fieldnames
         buffer[run_type] = pe.Node(
             niu.IdentityInterface(buffer_fieldnames),
@@ -61,31 +58,23 @@ def setup_buffer_nodes(wf_manager: WorkflowManager) -> BufferNodes:
     anat_buffer.inputs.t2w = wf_manager.anat
 
     # Template anatomical buffer
-    template_buffer = pe.Node(
-        niu.IdentityInterface(["template", "gm", "wm", "csf"]), name="template_buffer"
-    )
+    template_buffer = pe.Node(niu.IdentityInterface(["template", "gm", "wm", "csf"]), name="template_buffer")
     template_buffer.inputs.template = wf_manager.template["Base"]
     template_buffer.inputs.gm = wf_manager.template["Grey"]
     template_buffer.inputs.wm = wf_manager.template["White"]
     template_buffer.inputs.csf = wf_manager.template["CSF"]
 
     # bold - run-level - buffers
-    bold_buffer, bold_buffer_inputs = get_run_level_buffer_nodes(
-        wf_manager.bold_runs, "bold"
-    )
+    bold_buffer, bold_buffer_inputs = get_run_level_buffer_nodes(wf_manager.bold_runs, "bold")
 
     # fmap - run-level - buffers
-    fmap_buffer, fmap_buffer_inputs = get_run_level_buffer_nodes(
-        wf_manager.fmap_runs, "fmap"
-    )
+    fmap_buffer, fmap_buffer_inputs = get_run_level_buffer_nodes(wf_manager.fmap_runs, "fmap")
 
     # bold - [session|PE]-level - buffers
     bold_session_buffer = {}
-    for run_type, runs in bold_buffer_inputs.items():
+    for run_type, _runs in bold_buffer_inputs.items():
         bold_session_buffer[run_type] = pe.Node(
-            niu.IdentityInterface(
-                ["sdc_warp", "sdc_affine", "sdc_bold", "distorted_bold"]
-            ),
+            niu.IdentityInterface(["sdc_warp", "sdc_affine", "sdc_bold", "distorted_bold"]),
             name=f"bold_session_{run_type}_buffer",
         )
 
@@ -98,10 +87,7 @@ def setup_buffer_nodes(wf_manager: WorkflowManager) -> BufferNodes:
     # reg - [session|PE]-to-session template - affine registrations
     bold_session_template_reg_buffer = pe.Node(
         niu.IdentityInterface(
-            [
-                f"bold_session_{run_type}_to_bold_session_template_reg"
-                for run_type in bold_session_buffer.keys()
-            ]
+            [f"bold_session_{run_type}_to_bold_session_template_reg" for run_type in bold_session_buffer.keys()]
         ),
         name="bold_session_template_reg_buffer",
     )

@@ -1,10 +1,10 @@
+import os
+
 from nipype.interfaces.base import (
     File,
     SimpleInterface,
     TraitedSpec,
 )
-
-import os
 
 OUTPATH = "evenified.nii.gz"
 EXPECTED_N_DIMS = [3, 4]

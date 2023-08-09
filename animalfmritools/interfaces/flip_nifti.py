@@ -1,17 +1,17 @@
+import os
+
 from nipype.interfaces.base import (
     File,
     SimpleInterface,
     TraitedSpec,
 )
 
-import os
-
 OUTPATH = "flipped.nii.gz"
 
 
 def _FlipNifti(nifti_path, out_path=OUTPATH):
-    import numpy as np
     import nibabel as nib
+    import numpy as np
 
     img = nib.load(nifti_path)
     data = img.get_fdata()

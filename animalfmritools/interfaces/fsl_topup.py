@@ -1,19 +1,17 @@
+import os
+
+import numpy as np
 from nipype.interfaces.base import (
     File,
+    InputMultiPath,
     SimpleInterface,
     TraitedSpec,
-    traits,
-    InputMultiPath,
     isdefined,
+    traits,
 )
 from nipype.interfaces.fsl.base import FSLCommand, FSLCommandInputSpec
 from nipype.interfaces.fsl.utils import split_filename
-
 from traits.api import List
-
-import numpy as np
-
-import os
 
 OUTPATHS = {
     "TOPUP_VOL_1_DFM": "warpfield_01.nii.gz",
@@ -53,10 +51,7 @@ class TOPUPInputSpec(FSLCommandInputSpec):
         desc=("readout times (dwell times by # " "phase-encode steps minus 1)"),
     )
     out_base = File(
-        desc=(
-            "base-name of output files (spline "
-            "coefficients (Hz) and movement parameters)"
-        ),
+        desc=("base-name of output files (spline " "coefficients (Hz) and movement parameters)"),
         name_source=["in_file"],
         name_template="%s_base",
         argstr="--out=%s",
@@ -90,16 +85,10 @@ class TOPUPInputSpec(FSLCommandInputSpec):
     warp_res = traits.Float(
         10.0,
         argstr="--warpres=%f",
-        desc=(
-            "(approximate) resolution (in mm) of warp "
-            "basis for the different sub-sampling levels"
-            "."
-        ),
+        desc=("(approximate) resolution (in mm) of warp " "basis for the different sub-sampling levels" "."),
     )
     subsamp = traits.Int(1, argstr="--subsamp=%d", desc="sub-sampling scheme")
-    fwhm = traits.Float(
-        8.0, argstr="--fwhm=%f", desc="FWHM (in mm) of gaussian smoothing kernel"
-    )
+    fwhm = traits.Float(8.0, argstr="--fwhm=%f", desc="FWHM (in mm) of gaussian smoothing kernel")
     config = traits.String(
         "b02b0.cnf",
         argstr="--config=%s",
@@ -160,9 +149,7 @@ class TOPUPInputSpec(FSLCommandInputSpec):
         0,
         1,
         argstr="--minmet=%d",
-        desc=(
-            "Minimisation method 0=Levenberg-Marquardt, " "1=Scaled Conjugate Gradient"
-        ),
+        desc=("Minimisation method 0=Levenberg-Marquardt, " "1=Scaled Conjugate Gradient"),
     )
     splineorder = traits.Int(
         3,
@@ -256,12 +243,8 @@ class TOPUP(FSLCommand):
                 base_path = None
         else:
             base = split_filename(self.inputs.in_file)[1] + "_base"
-        outputs["out_fieldcoef"] = self._gen_fname(
-            base, suffix="_fieldcoef", cwd=base_path
-        )
-        outputs["out_movpar"] = self._gen_fname(
-            base, suffix="_movpar", ext=".txt", cwd=base_path
-        )
+        outputs["out_fieldcoef"] = self._gen_fname(base, suffix="_fieldcoef", cwd=base_path)
+        outputs["out_movpar"] = self._gen_fname(base, suffix="_movpar", ext=".txt", cwd=base_path)
 
         if isdefined(self.inputs.encoding_direction):
             outputs["out_enc_file"] = self._get_encfilename()
@@ -271,9 +254,7 @@ class TOPUP(FSLCommand):
         return outputs
 
     def _get_encfilename(self):
-        out_file = os.path.join(
-            os.getcwd(), ("%s_encfile.txt" % split_filename(self.inputs.in_file)[1])
-        )
+        out_file = os.path.join(os.getcwd(), ("%s_encfile.txt" % split_filename(self.inputs.in_file)[1]))
         return out_file
 
     def _generate_encfile(self):
@@ -282,12 +263,7 @@ class TOPUP(FSLCommand):
         durations = self.inputs.readout_times
         if len(self.inputs.encoding_direction) != len(durations):
             if len(self.inputs.readout_times) != 1:
-                raise ValueError(
-                    (
-                        "Readout time must be a float or match the"
-                        "length of encoding directions"
-                    )
-                )
+                raise ValueError(("Readout time must be a float or match the" "length of encoding directions"))
             durations = durations * len(self.inputs.encoding_direction)
 
         lines = []
@@ -295,9 +271,7 @@ class TOPUP(FSLCommand):
             direction = 1.0
             if encdir.endswith("-"):
                 direction = -1.0
-            line = [
-                float(val[0] == encdir[0]) * direction for val in ["x", "y", "z"]
-            ] + [durations[idx]]
+            line = [float(val[0] == encdir[0]) * direction for val in ["x", "y", "z"]] + [durations[idx]]
             lines.append(line)
         np.savetxt(out_file, np.array(lines), fmt="%d %d %d %.8f")
         return out_file

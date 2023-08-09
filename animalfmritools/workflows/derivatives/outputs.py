@@ -1,7 +1,8 @@
 from pathlib import Path
-from pydantic import BaseModel
-from niworkflows.engine.workflows import LiterateWorkflow as Workflow
+
 from nipype.interfaces import utility as niu
+from niworkflows.engine.workflows import LiterateWorkflow as Workflow
+from pydantic import BaseModel
 
 
 class BaseInfo(BaseModel):
@@ -64,7 +65,7 @@ def get_source_files(base_info: BaseInfo, derivatives_dir: Path) -> DerivativeOu
     """
     Registration is between single bold runs and PE-consistant bold referance run
     * Calculated for every bold run
-    * PE-consistent bold run is a designated single bold run, 
+    * PE-consistent bold run is a designated single bold run,
     and defined for each PE-direction
     * D = Distorted (non-SDC corrected)
     """
@@ -86,7 +87,7 @@ def get_source_files(base_info: BaseInfo, derivatives_dir: Path) -> DerivativeOu
 
 
 def create_base_directories(outputs: DerivativeOutputs) -> None:
-    for k, v in outputs.__annotations__.items():
+    for k, _v in outputs.__annotations__.items():
         p = getattr(outputs, k).parent
         if not p.exists():
             p.mkdir(parents=True)
@@ -104,10 +105,8 @@ def init_bold_preproc_derivatives_wf(
     # Create all expected parent directories found in `outputs
     create_base_directories(outputs)
 
-    inputnode_fields = [k for k in outputs.__annotations__.keys()]
-    inputnode = pe.Node(
-        niu.IdentityInterface(fields=inputnode_fields), name="inputnode"
-    )
+    inputnode_fields = list(outputs.__annotations__.keys())
+    inputnode = pe.Node(niu.IdentityInterface(fields=inputnode_fields), name="inputnode")
 
     for f in inputnode_fields:
         out_file = getattr(outputs, f)

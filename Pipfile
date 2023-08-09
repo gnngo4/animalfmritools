@@ -21,6 +21,8 @@ fslpy = "*"
 [dev-packages]
 ruff = "*"
 black = {extras = ["jupyter"], version = "*"}
+pytest = "*"
+pre-commit = "*"
 
 [requires]
 python_version = "3.10"

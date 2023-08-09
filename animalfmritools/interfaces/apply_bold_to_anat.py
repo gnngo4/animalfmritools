@@ -1,3 +1,5 @@
+import os
+
 from nipype.interfaces.base import (
     File,
     InputMultiObject,
@@ -5,8 +7,6 @@ from nipype.interfaces.base import (
     TraitedSpec,
     traits,
 )
-
-import os
 
 BOLD_TO_ANAT = "space-t2_bold.nii.gz"
 
@@ -18,18 +18,16 @@ def _ApplyBoldToAnat(
     anat_resampled,
     debug,
 ):
-    from nipype.interfaces import fsl
     import nibabel as nib
+    from nipype.interfaces import fsl
 
     split_bold = fsl.Split(dimension="t", in_file=bold_path)
     res = split_bold.run()
     bold_list = res.outputs.out_files
 
     vol_t1_bold = []
-    assert len(bold_list) == len(
-        hmc_mats
-    ), "hmc mats and split bold data are not equal lengths."
-    for ix, (vol_mat, vol_bold) in enumerate(zip(hmc_mats, bold_list)):
+    assert len(bold_list) == len(hmc_mats), "hmc mats and split bold data are not equal lengths."
+    for ix, (vol_mat, vol_bold) in enumerate(zip(hmc_mats, bold_list, strict=False)):
         if debug and ix == 10:
             break
 
