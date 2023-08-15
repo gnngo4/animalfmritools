@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from nipype.interfaces import utility as niu
+from nipype.interfaces.io import ExportFile
+from nipype.pipeline import engine as pe
 from niworkflows.engine.workflows import LiterateWorkflow as Workflow
 from pydantic import BaseModel
 
@@ -18,7 +20,7 @@ class DerivativeOutputs(BaseModel):
     bold_confounds: Path
     bold_confounds_metadata: Path
     bold_roi_svg: Path
-    reg_from_Dbold_to_Dboldref: Path
+    reg_from_Dbold_to_Dboldtemplate: Path
 
 
 def parse_bids_tag(stem: str, tag: str) -> str:
@@ -69,10 +71,10 @@ def get_source_files(base_info: BaseInfo, derivatives_dir: Path) -> DerivativeOu
     and defined for each PE-direction
     * D = Distorted (non-SDC corrected)
     """
-    reg_from_Dbold_to_Dboldref = Path(
+    reg_from_Dbold_to_Dboldtemplate = Path(
         f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
-        f"_dir-{base_info.dir_id}_run-{base_info.run_id}_from-Dbold_to-Dboldref.svg"
+        f"_dir-{base_info.dir_id}_run-{base_info.run_id}_from-Dbold_to-Dboldtemplate.svg"
     )
 
     outputs = DerivativeOutputs(
@@ -80,7 +82,7 @@ def get_source_files(base_info: BaseInfo, derivatives_dir: Path) -> DerivativeOu
         bold_confounds=bold_confounds,
         bold_confounds_metadata=bold_confounds_metadata,
         bold_roi_svg=bold_roi_svg,
-        reg_from_Dbold_to_Dboldref=reg_from_Dbold_to_Dboldref,
+        reg_from_Dbold_to_Dboldtemplate=reg_from_Dbold_to_Dboldtemplate,
     )
 
     return outputs
@@ -97,9 +99,6 @@ def init_bold_preproc_derivatives_wf(
     outputs: DerivativeOutputs,
     name: str,
 ) -> Workflow:
-    from nipype.interfaces.io import ExportFile
-    from nipype.pipeline import engine as pe
-
     workflow = Workflow(name=name)
 
     # Create all expected parent directories found in `outputs
