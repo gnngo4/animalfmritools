@@ -1,0 +1,5 @@
+outs:
+- md5: ed4188f2aa3a10801dfba61435aaede1
+  size: 243120
+  hash: md5
+  path: pipeline_gm.nii.gz
