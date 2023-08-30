@@ -1,6 +1,5 @@
 from typing import List
 
-from fmriprep.workflows.bold.registration import init_fsl_bbr_wf
 from nipype.interfaces import utility as niu
 from nipype.interfaces.ants import N4BiasFieldCorrection, RegistrationSynQuick
 from nipype.interfaces.fsl import FLIRT, MCFLIRT, ApplyWarp, ConvertWarp, ConvertXFM
@@ -70,29 +69,21 @@ def init_reg_Dbold_to_Dboldtemplate_wf(
     # Connect `inputnode` to `n4_buffer`
     workflow = connect_n4_nodes(inputnode, n4_buffer, workflow, INPUTNODE_FIELDS, n4_reg_flag=n4_reg_flag)
 
-    reg_Dbold_to_Dboldtemplate = init_fsl_bbr_wf(
-        bold2t1w_dof=6,
-        use_bbr=False,
-        bold2t1w_init="register",
-        omp_nthreads=4,
-        name="reg_Dbold_to_Dboldtemplate",
+    reg_Dbold_to_Dboldtemplate = pe.Node(
+        FLIRTRPT(dof=7, generate_report=True),
+        name="Dbold_to_Dboldtemplate",
     )
-
-    xfm_convert_itk_to_fsl = init_itk_to_fsl_affine_wf(name="itk_to_fsl_affine")
 
     # fmt: off
     workflow.connect([
         (n4_buffer, reg_Dbold_to_Dboldtemplate, [
-            ("Dbold", "inputnode.in_file"),
-            ("Dboldtemplate", "inputnode.t1w_brain"),
+            ("Dbold", "in_file"),
+            ("Dboldtemplate", "reference"),
         ]),
-        (reg_Dbold_to_Dboldtemplate, outputnode, [("outputnode.out_report", "out_report")]),
-        (reg_Dbold_to_Dboldtemplate, xfm_convert_itk_to_fsl, [("outputnode.itk_bold_to_t1", "inputnode.itk_affine")]),
-        (n4_buffer, xfm_convert_itk_to_fsl, [
-            ("Dbold", "inputnode.source"),
-            ("Dboldtemplate", "inputnode.reference"),
+        (reg_Dbold_to_Dboldtemplate, outputnode, [
+            ("out_report", "out_report"),
+            ("out_matrix_file", "fsl_affine")
         ]),
-        (xfm_convert_itk_to_fsl, outputnode, [("outputnode.fsl_affine", "fsl_affine")]),
     ])
     # fmt: on
 
@@ -127,29 +118,21 @@ def init_reg_UDbold_to_UDboldtemplate_wf(
     # Connect `inputnode` to `n4_buffer`
     workflow = connect_n4_nodes(inputnode, n4_buffer, workflow, INPUTNODE_FIELDS, n4_reg_flag=n4_reg_flag)
 
-    reg_UDbold_to_UDboldtemplate = init_fsl_bbr_wf(
-        bold2t1w_dof=6,
-        use_bbr=False,
-        bold2t1w_init="register",
-        omp_nthreads=4,
-        name="reg_UDbold_to_UDboldtemplate",
+    reg_UDbold_to_UDboldtemplate = pe.Node(
+        FLIRTRPT(dof=7, generate_report=True),
+        name="UDbold_to_UDboldtemplate",
     )
-
-    xfm_convert_itk_to_fsl = init_itk_to_fsl_affine_wf(name="itk_to_fsl_affine")
 
     # fmt: off
     workflow.connect([
         (n4_buffer, reg_UDbold_to_UDboldtemplate, [
-            ("UDbold", "inputnode.in_file"),
-            ("UDboldtemplate", "inputnode.t1w_brain"),
+            ("UDbold", "in_file"),
+            ("UDboldtemplate", "reference"),
         ]),
-        (reg_UDbold_to_UDboldtemplate, outputnode, [("outputnode.out_report", "out_report")]),
-        (reg_UDbold_to_UDboldtemplate, xfm_convert_itk_to_fsl, [("outputnode.itk_bold_to_t1", "inputnode.itk_affine")]),
-        (n4_buffer, xfm_convert_itk_to_fsl, [
-            ("UDbold", "inputnode.source"),
-            ("UDboldtemplate", "inputnode.reference"),
+        (reg_UDbold_to_UDboldtemplate, outputnode, [
+            ("out_report", "out_report"),
+            ("out_matrix_file", "fsl_affine"),
         ]),
-        (xfm_convert_itk_to_fsl, outputnode, [("outputnode.fsl_affine", "fsl_affine")]),
     ])
     # fmt: on
 
@@ -191,14 +174,10 @@ def init_reg_UDboldtemplate_to_anat_wf(name: str = "reg_UDboldtemplate_to_anat_w
     UDboldtemplate_3_genmask = pe.Node(Threshold(thresh=0), name="UDboldtemplate_3_generate_mask")
     UDboldtemplate_4_applymask = pe.Node(ApplyMask(), name="UDboldtemplate_4_apply_mask")
     # Register UDboldtemplate to anat
-    reg_UDboldtemplate_to_anat = init_fsl_bbr_wf(
-        bold2t1w_dof=6,
-        use_bbr=False,
-        bold2t1w_init="register",
-        omp_nthreads=4,
-        name="reg_UDboldtemplate_to_anat",
+    reg_UDboldtemplate_to_anat = pe.Node(
+        FLIRTRPT(dof=7, generate_report=True),
+        name="UDboldtemplate_to_anat",
     )
-    xfm_convert_itk_to_fsl = init_itk_to_fsl_affine_wf(name="itk_to_fsl_affine")
     outputnode = pe.Node(
         niu.IdentityInterface(fields=["out_report", "fsl_affine"]),
         name="outputnode",
@@ -221,13 +200,12 @@ def init_reg_UDboldtemplate_to_anat_wf(name: str = "reg_UDboldtemplate_to_anat_w
         (UDboldtemplate_2_initreg, UDboldtemplate_3_genmask, [("out_file", "in_file")]),
         (UDboldtemplate_1_n4, UDboldtemplate_4_applymask, [("output_image", "in_file")]),
         (UDboldtemplate_3_genmask, UDboldtemplate_4_applymask, [("out_file", "mask_file")]),
-        (UDboldtemplate_4_applymask, reg_UDboldtemplate_to_anat, [("out_file", "inputnode.in_file")]),
-        (inputnode, reg_UDboldtemplate_to_anat, [("masked_anat", "inputnode.t1w_brain")]),
-        (reg_UDboldtemplate_to_anat, outputnode, [("outputnode.out_report", "out_report")]),
-        (reg_UDboldtemplate_to_anat, xfm_convert_itk_to_fsl, [("outputnode.itk_bold_to_t1", "inputnode.itk_affine")]),
-        (UDboldtemplate_4_applymask, xfm_convert_itk_to_fsl, [("out_file", "inputnode.source")]),
-        (inputnode, xfm_convert_itk_to_fsl, [("masked_anat", "inputnode.reference")]),
-        (xfm_convert_itk_to_fsl, outputnode, [("outputnode.fsl_affine", "fsl_affine")]),
+        (UDboldtemplate_4_applymask, reg_UDboldtemplate_to_anat, [("out_file", "in_file")]),
+        (inputnode, reg_UDboldtemplate_to_anat, [("masked_anat", "reference")]),
+        (reg_UDboldtemplate_to_anat, outputnode, [
+            ("out_matrix_file", "fsl_affine"),
+            ("out_report", "out_report"),
+        ]),
     ])
     # fmt: on
 
@@ -257,7 +235,7 @@ def init_reg_anat_to_template_wf(template_thr: float, name: str = "reg_anat_to_t
     # Brain extract anatomical
     anat_1_initreg = pe.Node(
         FLIRT(
-            dof=6,
+            dof=12,
             searchr_x=[-180, 180],
             searchr_y=[-180, 180],
             searchr_z=[-180, 180],
@@ -270,7 +248,7 @@ def init_reg_anat_to_template_wf(template_thr: float, name: str = "reg_anat_to_t
     # Register anat to template
     reg_anat_to_template_init = pe.Node(
         FLIRTRPT(
-            dof=12,
+            dof=6,
             searchr_x=[-180, 180],
             searchr_y=[-180, 180],
             searchr_z=[-180, 180],
@@ -278,7 +256,7 @@ def init_reg_anat_to_template_wf(template_thr: float, name: str = "reg_anat_to_t
         ),
         name="anat_to_template_init",
     )
-    reg_anat_to_template = pe.Node(RegistrationSynQuick(transform_type="sr"), name="anat_to_template")
+    reg_anat_to_template = pe.Node(RegistrationSynQuick(transform_type="b"), name="anat_to_template")
     report_anat_to_template = pe.Node(
         ANTSApplyTransformsRPT(generate_report=True), name="generate_report_anat_to_template"
     )

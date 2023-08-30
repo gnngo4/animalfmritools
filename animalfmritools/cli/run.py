@@ -81,6 +81,10 @@ def run():
     """
     reorient_anat = pe.Node(Reorient2Std(), name="reorient_anat")
     rescale_anat = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_anat")
+    reorient_template = pe.Node(Reorient2Std(), name="reorient_template")
+    reorient_template_gm = pe.Node(Reorient2Std(), name="reorient_template_gm")
+    reorient_template_wm = pe.Node(Reorient2Std(), name="reorient_template_wm")
+    reorient_template_csf = pe.Node(Reorient2Std(), name="reorient_template_csf")
     rescale_template = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_template")
     rescale_template_gm = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_template_gm")
     rescale_template_wm = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_template_wm")
@@ -90,10 +94,14 @@ def run():
     wf.connect([
         (buffer_nodes.anat, reorient_anat, [("t2w", "in_file")]),
         (reorient_anat, rescale_anat, [("out_file", "nifti_path")]),
-        (buffer_nodes.template, rescale_template, [("template", "nifti_path")]),
-        (buffer_nodes.template, rescale_template_gm, [("gm", "nifti_path")]),
-        (buffer_nodes.template, rescale_template_wm, [("wm", "nifti_path")]),
-        (buffer_nodes.template, rescale_template_csf, [("csf", "nifti_path")]),
+        (buffer_nodes.template, reorient_template, [("template", "in_file")]),
+        (reorient_template, rescale_template, [("out_file", "nifti_path")]),
+        (buffer_nodes.template, reorient_template_gm, [("gm", "in_file")]),
+        (reorient_template_gm, rescale_template_gm, [("out_file", "nifti_path")]),
+        (buffer_nodes.template, reorient_template_wm, [("wm", "in_file")]),
+        (reorient_template_wm, rescale_template_wm, [("out_file", "nifti_path")]),
+        (buffer_nodes.template, reorient_template_csf, [("csf", "in_file")]),
+        (reorient_template_csf, rescale_template_csf, [("out_file", "nifti_path")]),
     ])
     # fmt: on
 
