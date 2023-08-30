@@ -1,5 +1,0 @@
-outs:
-- md5: f5a81df7382f9ad0aefbf0b1c0e5687a
-  size: 128225
-  hash: md5
-  path: pipeline_wm.nii.gz
