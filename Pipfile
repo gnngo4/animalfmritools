@@ -17,7 +17,7 @@ matplotlib = "*"
 nipype = "*"
 pydantic = "*"
 fslpy = "*"
-dvc = "*"
+dvc = {extras = ["all"], version = "*"}
 
 [dev-packages]
 ruff = "*"

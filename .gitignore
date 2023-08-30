@@ -1,6 +1,8 @@
+# singularity image
 *simg
+
+# FS license
 docker/files/freesurfer_license.txt
-animalfmritools/data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
