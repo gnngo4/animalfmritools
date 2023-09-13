@@ -1,1 +1,1 @@
-docker run --rm -it -v $PWD:/opt/animalfmritools -p 9888:9888 --expose 9888 animalfmritools jupyter lab --port=9888 --no-browser --ip=0.0.0.0 --notebook-dir=/opt/animalfmritools/notebooks --allow-root
+docker run --rm -it -v $PWD:/opt/animalfmritools -p 9888:9888 --expose 9888 --entrypoint=jupyter animalfmritools lab --port=9888 --no-browser --ip=0.0.0.0 --notebook-dir=/opt/animalfmritools/notebooks --allow-root
