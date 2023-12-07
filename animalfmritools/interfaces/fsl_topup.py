@@ -297,15 +297,22 @@ def _TOPUPAcqParams(nifti_list, out_path=OUTPATHS["TOPUPAcqParams"]):
                 data = json.load(json_f)
             # Check if required metadata can be found
             for k in TOPUP_KEYS:
-                assert k in data.keys(), f"[{k}] metadata is missing from .json"
-            echo_spacing = 1 / (data["PixelBandwidth"])
-            n_echos = data["EchoTrainLength"]
-            total_readout_time = n_echos * echo_spacing
+                if k not in data.keys():
+                    print(f"[{k}] metadata is missing from .json")
+                    total_readout_time = 0.1
+                else:
+                    echo_spacing = 1 / (data["PixelBandwidth"])
+                    n_echos = data["EchoTrainLength"]
+                    total_readout_time = n_echos * echo_spacing
             pedir = p.split("dir-")[-1].split("_")[0]
-            if pedir == "PA" or pedir == "rev":
+            if pedir == "PA":
                 pedir_encoding = ["0", "1", "0", f"{total_readout_time:.5f}"]
-            elif pedir == "AP" or pedir == "fwd":
+            elif pedir == "AP":
                 pedir_encoding = ["0", "-1", "0", f"{total_readout_time:.5f}"]
+            elif pedir == "RL":
+                pedir_encoding = ["1", "0", "0", f"{total_readout_time:.5f}"]
+            elif pedir == "LR":
+                pedir_encoding = ["-1", "0", "0", f"{total_readout_time:.5f}"]
             else:
                 raise NotImplementedError("This functionality is not implemented yet.")
             f.write(" ".join(pedir_encoding) + "\n")
