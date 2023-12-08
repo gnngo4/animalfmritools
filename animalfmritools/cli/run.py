@@ -65,7 +65,9 @@ def run():
     args = parser.parse_args()
 
     # Subject info
-    wf_manager = setup_workflow(args.subject_id, args.session_id, args.bids_dir, args.out_dir, args.scratch_dir)
+    wf_manager = setup_workflow(
+        args.species_id, args.subject_id, args.session_id, args.bids_dir, args.out_dir, args.scratch_dir
+    )
 
     # Instantiate workflow
     wf = Workflow(
@@ -284,6 +286,10 @@ def run():
     # fmt: on
 
     # Register anat to template
+    if args.species_id == 'marmoset':
+        TEMPLATE_THRESHOLDING = 0.5
+    else:
+        TEMPLATE_THRESHOLDING = 5
     reg_anat_to_template = init_reg_anat_to_template_wf(TEMPLATE_THRESHOLDING, name="reg_anat_to_template_wf")
 
     # Register undistorted bold template to anat
@@ -311,7 +317,19 @@ def run():
             # Select bold path and load associated metadata
             prefix = f"{bold_input}_{run_type}"
             bold_path = wf_manager.bold_runs[run_type][bold_ix]
-            metadata = load_json_as_dict(Path(str(bold_path).replace(".nii.gz", ".json")))
+            json_path = Path(str(bold_path).replace(".nii.gz", ".json"))
+            try:
+                metadata = load_json_as_dict(json_path)
+            except FileNotFoundError:
+                print(f"{json_path} not found.\nCreating empty metadata dictionary.")
+                assert args.repetition_time is not None, "Must specify --repetition-time argument."
+                metadata = {}
+                metadata["RepetitionTime"] = args.repetition_time
+            except Exception as e:
+                print(f"An unexpected error occured: {e}\nCreating empty metadata dictionary.")
+                assert args.repetition_time is not None, "Must specify --repetition-time argument."
+                metadata = {}
+                metadata["RepetitionTime"] = args.repetition_time
 
             # Transform bold to template space
             boldref = init_bold_ref_wf(name=f"{prefix}_bold_reference")

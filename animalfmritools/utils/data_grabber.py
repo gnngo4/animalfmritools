@@ -5,24 +5,24 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 
 REVERSE_PE_MAPPING = {
-    "dir-fwd": "dir-rev",
-    "dir-rev": "dir-fwd",
     "dir-AP": "dir-PA",
     "dir-PA": "dir-AP",
+    "dir-LR": "dir-RL",
+    "dir-RL": "dir-LR",
 }
 
 PE_DIR_FLIP: Dict[str, bool] = {
     "dir-AP": False,
     "dir-PA": True,
-    "dir-fwd": False,
-    "dir-rev": True,
+    "dir-LR": False,
+    "dir-RL": True,
 }
 
 PE_DIR_SCHEMA: Dict[str, List[str]] = {
     "dir-AP": [],
     "dir-PA": [],
-    "dir-fwd": [],
-    "dir-rev": [],
+    "dir-LR": [],
+    "dir-RL": [],
 }
 
 

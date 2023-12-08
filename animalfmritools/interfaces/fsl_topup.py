@@ -293,13 +293,16 @@ def _TOPUPAcqParams(nifti_list, out_path=OUTPATHS["TOPUPAcqParams"]):
         for p in json_list:
             assert "dir-" in p, f"{p} does not contain [dir-]"
             # Load metadata
-            with open(p, "r") as json_f:
-                data = json.load(json_f)
+            try:
+                with open(p, "r") as json_f:
+                    data = json.load(json_f)
+            except Exception:
+                data = {}
             # Check if required metadata can be found
             for k in TOPUP_KEYS:
                 if k not in data.keys():
                     print(f"[{k}] metadata is missing from .json")
-                    total_readout_time = 0.1
+                    total_readout_time = 0.01
                 else:
                     echo_spacing = 1 / (data["PixelBandwidth"])
                     n_echos = data["EchoTrainLength"]

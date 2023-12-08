@@ -27,6 +27,20 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out_dir", required=True, type=str, help="output directory.")
 
     parser.add_argument(
+        "--species_id",
+        default="mouse",
+        type=str,
+        help="species ID - affects which template is chosen.\nOnly mouse, marmoset are supported.",
+    )
+
+    parser.add_argument(
+        "--repetition_time",
+        default=None,
+        type=float,
+        help="Manual input repetition time (TR).\nMust specify if json file is missing",
+    )
+
+    parser.add_argument(
         "--scratch_dir",
         default="/tmp",
         type=str,
