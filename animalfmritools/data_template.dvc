@@ -1,6 +1,6 @@
 outs:
-- md5: b2e596f446fc90946e877e99199d6bc3.dir
-  size: 95951103
-  nfiles: 33
+- md5: a1ac2a816769cc5d92dde36a6f571b54.dir
+  size: 966404848
+  nfiles: 318
   hash: md5
   path: data_template
