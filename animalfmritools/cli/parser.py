@@ -3,7 +3,7 @@ import argparse
 
 def setup_parser() -> argparse.ArgumentParser:
     """
-    Set-up Python's ArgumentParser for oscprep
+    Set-up Python's ArgumentParser for animalfmritools
     """
 
     parser = argparse.ArgumentParser()
@@ -38,6 +38,20 @@ def setup_parser() -> argparse.ArgumentParser:
         default=None,
         type=float,
         help="Manual input repetition time (TR).\nMust specify if json file is missing",
+    )
+
+    parser.add_argument(
+        "--force_anat",
+        default=None,
+        type=str,
+        help="Manual input anatomical image [.nii.gz].\nMust specify if anat is missing",
+    )
+
+    parser.add_argument(
+        "--anat_contrast",
+        default="T2w",
+        type=str,
+        help="Manual input of anatomical contrast to search for (default: T2w).",
     )
 
     parser.add_argument(

@@ -1,11 +1,10 @@
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
 from animalfmritools.utils.data_grabber import BidsReader
 
-# DATADIR = Path("/opt/animalfmritools/animalfmritools/data")
 TEMPLATE_DIR = {
     "MouseABA": Path("/opt/animalfmritools/animalfmritools/data_template/MouseABA"),  # Mouse
     "MBM_v3.0.1": Path("/opt/animalfmritools/animalfmritools/data_template/MBM_v3.0.1"),  # Marmoset
@@ -58,6 +57,8 @@ def setup_workflow(
     bids_dir: Path,
     deriv_dir: Path,
     scratch_dir: Path,
+    force_anat: Optional[Path] = None,
+    anat_contrast_type: str = "T2w",
 ) -> WorkflowManager:
     bids_reader = BidsReader(bids_dir)
     data = {
@@ -66,7 +67,7 @@ def setup_workflow(
         "bids_dir": bids_dir,
         "deriv_dir": deriv_dir,
         "scratch_dir": scratch_dir,
-        "anat": bids_reader.get_anat(sub_id),
+        "anat": bids_reader.get_anat(sub_id, ses_id=ses_id, force_anat=force_anat, contrast_type=anat_contrast_type),
         "bold_runs": bids_reader.get_bold_runs(sub_id, ses_id, ignore_tasks=[]),
         "fmap_runs": bids_reader.get_fmap_runs(sub_id, ses_id),
         "template": get_template_data(species_id),

@@ -66,7 +66,14 @@ def run():
 
     # Subject info
     wf_manager = setup_workflow(
-        args.species_id, args.subject_id, args.session_id, args.bids_dir, args.out_dir, args.scratch_dir
+        args.species_id,
+        args.subject_id,
+        args.session_id,
+        args.bids_dir,
+        args.out_dir,
+        args.scratch_dir,
+        force_anat=args.force_anat,
+        anat_contrast_type=args.anat_contrast,
     )
 
     # Instantiate workflow

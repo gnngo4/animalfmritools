@@ -60,34 +60,38 @@ class BidsReader(BidsReaderInput):
         self,
         sub_id: str,
         ses_id: Optional[str] = None,
+        force_anat: Optional[Path] = None,
         contrast_type: str = "T2w",
     ) -> Path:
+        if force_anat is not None and force_anat.exists():
+            print(f"Warning: Using {force_anat} as the anatomical image.")
+            return force_anat
+
         # If multiple T2w runs detected, grab the last one
-        runs = []
+        runs: List[Path] = []
         if ses_id is not None:
             # Find a T2w given a subject and session ID
             sub_ses_anat_dir = (
                 Path(self.bids_dir) / self._process_dir(sub_id, "sub") / self._process_dir(ses_id, "ses") / "anat"
             )
             for i in sub_ses_anat_dir.iterdir():
-                if not i.is_dir() and i.name.endswith("_T2w.nii.gz"):
+                if not i.is_dir() and i.name.endswith(f"_{contrast_type}.nii.gz"):
                     runs.append(i)
-        else:
-            # Find any T2w across all sessions
-            ses_ids = self.get_sessions(sub_id)
-            for _ses_id in ses_ids:
-                sub_ses_anat_dir = (
-                    Path(self.bids_dir) / self._process_dir(sub_id, "sub") / self._process_dir(_ses_id, "ses") / "anat"
+            if runs == 0:
+                print(
+                    f"Warning: No runs detected in {sub_ses_anat_dir}.\nSearching for an anatomical across all sessions."
                 )
-                for i in sub_ses_anat_dir.iterdir():
-                    if not i.is_dir() and i.name.endswith("_T2w.nii.gz"):
-                        runs.append(i)
+                # Find a T2w given a subject ID
+                runs = self._find_t2w_across_sessions(sub_id, contrast_type=contrast_type)
+        else:
+            # Find a T2w given a subject ID
+            runs = self._find_t2w_across_sessions(sub_id, contrast_type=contrast_type)
 
         n_runs = len(runs)
-        assert n_runs > 0, f"Warning: {n_runs} detected."
+        assert n_runs > 0, "Warning: No runs were detected.\nExiting."
 
         if n_runs > 1:
-            print(f"Warning: Multiple runs detected, using {runs[-1].stem}")
+            print(f"Warning: Multiple runs were detected, using {runs[-1].stem}")
 
         return runs[-1]
 
@@ -154,6 +158,19 @@ class BidsReader(BidsReaderInput):
                 runs.sort()
 
         return runs_dict
+
+    def _find_t2w_across_sessions(self, sub_id: str, contrast_type: str = "T2w") -> List[Path]:
+        runs = []
+        ses_ids = self.get_sessions(sub_id)
+        for _ses_id in ses_ids:
+            sub_ses_anat_dir = (
+                Path(self.bids_dir) / self._process_dir(sub_id, "sub") / self._process_dir(_ses_id, "ses") / "anat"
+            )
+            for i in sub_ses_anat_dir.iterdir():
+                if not i.is_dir() and i.name.endswith(f"_{contrast_type}.nii.gz"):
+                    runs.append(i)
+
+        return runs
 
     def _remove_phase_parts(self, bold_list: List[Path]) -> List[Path]:
         return [bold_path for bold_path in bold_list if "_part-phase_" not in str(bold_path)]
