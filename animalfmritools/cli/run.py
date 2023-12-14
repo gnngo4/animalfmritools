@@ -65,6 +65,12 @@ def run():
     parser = setup_parser()
     args = parser.parse_args()
 
+    if isinstance(args.force_anat, str):
+        force_anat = Path(args.force_anat)
+        assert force_anat.exists(), f"{force_anat} does not exist."
+    else:
+        force_anat = args.force_anat
+
     # Subject info
     wf_manager = setup_workflow(
         args.species_id,
@@ -73,7 +79,7 @@ def run():
         args.bids_dir,
         args.out_dir,
         args.scratch_dir,
-        force_anat=args.force_anat,
+        force_anat=force_anat,
         anat_contrast_type=args.anat_contrast,
     )
 
