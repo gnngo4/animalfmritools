@@ -90,6 +90,72 @@ def init_reg_Dbold_to_Dboldtemplate_wf(
     return workflow
 
 
+def init_reg_Dboldtemplate_to_anat_wf(name: str = "reg_Dboldtemplate_to_anat_wf") -> Workflow:
+    """
+    Dboldtemplate: (NOT) distortion corrected, mask, and temporally meaned
+    anat: n4 bias field corrected, masked, regridded to bold FOV
+    """
+
+    workflow = Workflow(name=name)
+
+    INPUTNODE_FIELDS = [
+        "Dboldtemplate_run",
+        "masked_anat",
+    ]
+
+    inputnode = pe.Node(
+        niu.IdentityInterface(fields=INPUTNODE_FIELDS),
+        name="inputnode",
+    )
+
+    """
+    Distortion correct and obtain a mean image of the heuristically selected
+    inputnode: `Dboldtemplate_run`
+    """
+    Dboldtemplate_1_split = pe.Node(Split(dimension="t", out_base_name="split_bold_"), name="Dboldtemplate_1_split")
+    Dboldtemplate_2_hmc = pe.Node(
+        MCFLIRT(save_mats=False, save_plots=False, save_rms=False), name="Dboldtemplate_2_hmc"
+    )
+    Dboldtemplate_3_tmean = pe.Node(MeanImage(), name="Dboldtemplate_3_tmean")
+    # Brain extract the mean bold image
+    Dboldtemplate_1_n4 = pe.Node(N4BiasFieldCorrection(), name="Dboldtemplate_1_n4")
+    Dboldtemplate_2_initreg = pe.Node(FLIRT(dof=6), name="Dboldtemplate_2_initreg_anat_to_Dboldtemplate")
+    Dboldtemplate_3_genmask = pe.Node(Threshold(thresh=0), name="Dboldtemplate_3_generate_mask")
+    Dboldtemplate_4_applymask = pe.Node(ApplyMask(), name="Dboldtemplate_4_apply_mask")
+    # Register UDboldtemplate to anat
+    reg_Dboldtemplate_to_anat = pe.Node(
+        FLIRTRPT(dof=7, generate_report=True),
+        name="Dboldtemplate_to_anat",
+    )
+    outputnode = pe.Node(
+        niu.IdentityInterface(fields=["out_report", "fsl_affine"]),
+        name="outputnode",
+    )
+
+    # fmt: off
+    workflow.connect([
+        (inputnode, Dboldtemplate_1_split, [("Dboldtemplate_run", "in_file")]),
+        (inputnode, Dboldtemplate_2_hmc, [("Dboldtemplate_run", "in_file")]),
+        (Dboldtemplate_1_split, Dboldtemplate_2_hmc, [(("out_files", _get_split_volume, 0), "ref_file")]),
+        (Dboldtemplate_2_hmc, Dboldtemplate_3_tmean, [("out_file", "in_file")]),
+        (Dboldtemplate_3_tmean, Dboldtemplate_1_n4, [("out_file", "input_image")]),
+        (inputnode, Dboldtemplate_2_initreg, [("masked_anat", "in_file")]),
+        (Dboldtemplate_1_n4, Dboldtemplate_2_initreg, [("output_image","reference")]),
+        (Dboldtemplate_2_initreg, Dboldtemplate_3_genmask, [("out_file", "in_file")]),
+        (Dboldtemplate_1_n4, Dboldtemplate_4_applymask, [("output_image", "in_file")]),
+        (Dboldtemplate_3_genmask, Dboldtemplate_4_applymask, [("out_file", "mask_file")]),
+        (Dboldtemplate_4_applymask, reg_Dboldtemplate_to_anat, [("out_file", "in_file")]),
+        (inputnode, reg_Dboldtemplate_to_anat, [("masked_anat", "reference")]),
+        (reg_Dboldtemplate_to_anat, outputnode, [
+            ("out_matrix_file", "fsl_affine"),
+            ("out_report", "out_report"),
+        ]),
+    ])
+    # fmt: on
+
+    return workflow
+
+
 def init_reg_UDbold_to_UDboldtemplate_wf(
     n4_reg_flag: bool = False, name: str = "reg_UDbold_to_UDboldtemplate_wf"
 ) -> Workflow:

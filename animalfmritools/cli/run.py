@@ -52,6 +52,7 @@ from animalfmritools.workflows.registration.apply import init_trans_bold_to_temp
 from animalfmritools.workflows.registration.transforms import (
     init_reg_anat_to_template_wf,
     init_reg_Dbold_to_Dboldtemplate_wf,
+    init_reg_Dboldtemplate_to_anat_wf,
     init_reg_UDbold_to_UDboldtemplate_wf,
     init_reg_UDboldtemplate_to_anat_wf,
 )
@@ -156,6 +157,12 @@ def run():
             # fmt: on
 
     """
+    `no_sdc` is set to True if no opposite phase-encoding gradient
+    echo run is detected.
+    """
+    no_sdc = False
+
+    """
     Set-up bold template (one template per PE-direction [run_type])
     - SDC unwarping will be estimated for the bold template
         - select first bold run,
@@ -164,6 +171,7 @@ def run():
             - look through bids fmap folder, if nothing found look for reverse PE-bold runs, and extract first volume,
         - use the reverse PE pairs to perform topup and obtain the displacement warp for the 1st volume
     """
+    sdc_buffer = None
     for run_type, runs in buffer_nodes.bold_inputs.items():
         sdc_buffer = pe.Node(
             niu.IdentityInterface(["forward_pe', 'reverse_pe"]),
@@ -207,25 +215,29 @@ def run():
                 ])
                 # fmt: on
 
-            except Exception as err:
-                raise ValueError(f"A reverse PE run could not be found [{reverse_run_type}].") from err
+            except Exception:
+                no_sdc = True
+                print(
+                    f"Warning: No reverse PE run were identified [{reverse_run_type}]\nProceed by employing linear registration from BOLD to anat."
+                )
 
-        session_sdc = init_bold_sdc_wf(
-            forward_pe_metadata,
-            reverse_pe_metadata,
-            name=f"session_bold_sdc_{run_type}",
-        )
-        # fmt: off
-        wf.connect([
-            (sdc_buffer, session_sdc, [("forward_pe", "inputnode.forward_pe")]),
-            (sdc_buffer, session_sdc, [("reverse_pe", "inputnode.reverse_pe")]),
-            (session_sdc, buffer_nodes.bold_session[run_type], [
-                ("outputnode.sdc_warp", "sdc_warp"),
-                ("outputnode.sdc_bold", "sdc_bold"),
-                ("outputnode.sdc_affine", "sdc_affine"),
+        if not no_sdc:
+            session_sdc = init_bold_sdc_wf(
+                forward_pe_metadata,
+                reverse_pe_metadata,
+                name=f"session_bold_sdc_{run_type}",
+            )
+            # fmt: off
+            wf.connect([
+                (sdc_buffer, session_sdc, [("forward_pe", "inputnode.forward_pe")]),
+                (sdc_buffer, session_sdc, [("reverse_pe", "inputnode.reverse_pe")]),
+                (session_sdc, buffer_nodes.bold_session[run_type], [
+                    ("outputnode.sdc_warp", "sdc_warp"),
+                    ("outputnode.sdc_bold", "sdc_bold"),
+                    ("outputnode.sdc_affine", "sdc_affine"),
+                ])
             ])
-        ])
-        # fmt: on
+            # fmt: on
 
     """
     Set-up base derivatives workflow
@@ -241,40 +253,47 @@ def run():
         first_dir_type,
         all_dir_types,
     )
-    base_deriv_wf = init_base_preproc_derivatives_wf(
-        deriv_outputs,
-        name="base_derivatives",
-    )
+    base_deriv_wf = init_base_preproc_derivatives_wf(deriv_outputs, name="base_derivatives", no_sdc=no_sdc)
 
     """
     Register all `sdc_bold`  to the first run_type
     """
-
-    # fmt: off
-    wf.connect([
-        (buffer_nodes.bold_session[first_dir_type], buffer_nodes.bold_session_template, [("sdc_bold", "bold_session_template")]),
-    ])
-    # fmt: on
-    for session_ix, run_type in enumerate(buffer_nodes.bold_session.keys()):
-        if session_ix == 0:
-            # fmt: off
-            wf.connect([
-                (buffer_nodes.bold_session[run_type], buffer_nodes.bold_session_template_reg, [("sdc_affine", f"bold_session_{run_type}_to_bold_session_template_reg")])
-            ])
-            # fmt: on
-        else:
-            reg_UDbold_to_UDboldtemplate = init_reg_UDbold_to_UDboldtemplate_wf(
-                n4_reg_flag=True,
-                name=f"reg_UDbold_to_UDboldtemplate_{run_type}_wf",
-            )
-            # fmt: off
-            wf.connect([
-                (buffer_nodes.bold_session_template, reg_UDbold_to_UDboldtemplate, [("bold_session_template", "inputnode.UDboldtemplate")]),
-                (buffer_nodes.bold_session[run_type], reg_UDbold_to_UDboldtemplate, [("sdc_bold", "inputnode.UDbold")]),
-                (reg_UDbold_to_UDboldtemplate, buffer_nodes.bold_session_template_reg, [("outputnode.fsl_affine", f"bold_session_{run_type}_to_bold_session_template_reg")]),
-                (reg_UDbold_to_UDboldtemplate, base_deriv_wf, [("outputnode.out_report", f"inputnode.reg_from_UDbold{run_type}_to_UDboldtemplate")]),
-            ])
-            # fmt: on
+    if no_sdc:
+        """
+        Node: `buffer_nodes.bold_session_template`, output: "bold_session_template"
+            - only used for regridding anatomical and template to native BOLD resolution
+        """
+        # fmt: off
+        wf.connect([
+            (sdc_buffer, buffer_nodes.bold_session_template, [("forward_pe", "bold_session_template")]),
+        ])
+        # fmt: on
+    else:
+        # fmt: off
+        wf.connect([
+            (buffer_nodes.bold_session[first_dir_type], buffer_nodes.bold_session_template, [("sdc_bold", "bold_session_template")]),
+        ])
+        # fmt: on
+        for session_ix, run_type in enumerate(buffer_nodes.bold_session.keys()):
+            if session_ix == 0:
+                # fmt: off
+                wf.connect([
+                    (buffer_nodes.bold_session[run_type], buffer_nodes.bold_session_template_reg, [("sdc_affine", f"bold_session_{run_type}_to_bold_session_template_reg")])
+                ])
+                # fmt: on
+            else:
+                reg_UDbold_to_UDboldtemplate = init_reg_UDbold_to_UDboldtemplate_wf(
+                    n4_reg_flag=True,
+                    name=f"reg_UDbold_to_UDboldtemplate_{run_type}_wf",
+                )
+                # fmt: off
+                wf.connect([
+                    (buffer_nodes.bold_session_template, reg_UDbold_to_UDboldtemplate, [("bold_session_template", "inputnode.UDboldtemplate")]),
+                    (buffer_nodes.bold_session[run_type], reg_UDbold_to_UDboldtemplate, [("sdc_bold", "inputnode.UDbold")]),
+                    (reg_UDbold_to_UDboldtemplate, buffer_nodes.bold_session_template_reg, [("outputnode.fsl_affine", f"bold_session_{run_type}_to_bold_session_template_reg")]),
+                    (reg_UDbold_to_UDboldtemplate, base_deriv_wf, [("outputnode.out_report", f"inputnode.reg_from_UDbold{run_type}_to_UDboldtemplate")]),
+                ])
+                # fmt: on
 
     # Regrid anat and template
     regrid_anat_to_bold = init_regrid_anat_to_bold_wf(name="regrid_anat_to_bold_wf")
@@ -300,17 +319,57 @@ def run():
     reg_anat_to_template = init_reg_anat_to_template_wf(TEMPLATE_THRESHOLDING, name="reg_anat_to_template_wf")
 
     # Register undistorted bold template to anat
-    reg_UDboldtemplate_to_anat = init_reg_UDboldtemplate_to_anat_wf(name="reg_UDboldtemplate_to_anat_wf")
-
     session_bold_run_input = buffer_nodes.bold_inputs[first_dir_type][0]
+    reg_Dboldtemplate_to_anat = None
+    reg_UDboldtemplate_to_anat = None
+    if no_sdc:
+        reg_Dboldtemplate_to_anat = init_reg_Dboldtemplate_to_anat_wf(name="reg_Dboldtemplate_to_anat")
+        wf.connect(
+            [
+                (
+                    buffer_nodes.bold[first_dir_type],
+                    reg_Dboldtemplate_to_anat,
+                    [(session_bold_run_input, "inputnode.Dboldtemplate_run")],
+                ),
+                (reg_anat_to_template, reg_Dboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")]),
+                (
+                    reg_Dboldtemplate_to_anat,
+                    base_deriv_wf,
+                    [("outputnode.out_report", "inputnode.reg_from_Dboldtemplate_to_anat")],
+                ),
+            ]
+        )
+    else:
+        reg_UDboldtemplate_to_anat = init_reg_UDboldtemplate_to_anat_wf(name="reg_UDboldtemplate_to_anat_wf")
+        wf.connect(
+            [
+                (
+                    buffer_nodes.bold[first_dir_type],
+                    reg_UDboldtemplate_to_anat,
+                    [(session_bold_run_input, "inputnode.Dboldtemplate_run")],
+                ),
+                (
+                    buffer_nodes.bold_session[first_dir_type],
+                    reg_UDboldtemplate_to_anat,
+                    [("sdc_warp", "inputnode.Dboldtemplate_sdc_warp")],
+                ),
+                (
+                    reg_anat_to_template,
+                    reg_UDboldtemplate_to_anat,
+                    [("outputnode.anat_brain", "inputnode.masked_anat")],
+                ),
+                (
+                    reg_UDboldtemplate_to_anat,
+                    base_deriv_wf,
+                    [("outputnode.out_report", "inputnode.reg_from_UDboldtemplate_to_anat")],
+                ),
+            ]
+        )
+
     # fmt: off
     wf.connect([
         (regrid_anat_to_bold, reg_anat_to_template, [("outputnode.regridded_anat", "inputnode.anat")]),
         (regrid_template_to_bold, reg_anat_to_template, [("outputnode.regridded_template", "inputnode.template")]),
-        (buffer_nodes.bold[first_dir_type], reg_UDboldtemplate_to_anat, [(session_bold_run_input, "inputnode.Dboldtemplate_run")]),
-        (buffer_nodes.bold_session[first_dir_type], reg_UDboldtemplate_to_anat, [("sdc_warp", "inputnode.Dboldtemplate_sdc_warp")]),
-        (reg_anat_to_template, reg_UDboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")]),
-        (reg_UDboldtemplate_to_anat, base_deriv_wf, [("outputnode.out_report", "inputnode.reg_from_UDboldtemplate_to_anat")]),
         (reg_anat_to_template, base_deriv_wf, [
             ("outputnode.init_out_report", "inputnode.reg_from_anat_to_template_init"),
             ("outputnode.out_report", "inputnode.reg_from_anat_to_template"),
@@ -345,8 +404,23 @@ def run():
                 n4_reg_flag=True, name=f"{prefix}_reg_Dbold_to_Dboldtemplate"
             )
             trans_Dbold_to_template = init_trans_bold_to_template_wf(
-                reg_quick=args.reg_quick, name=f"{prefix}_transform_Dbold_to_template"
+                no_sdc=no_sdc, reg_quick=args.reg_quick, name=f"{prefix}_transform_Dbold_to_template"
             )
+
+            if no_sdc:
+                # fmt: off
+                wf.connect([
+                    (reg_Dboldtemplate_to_anat, trans_Dbold_to_template, [("outputnode.fsl_affine", "inputnode.Dboldtemplate_to_anat_aff")]),
+                ])
+                # fmt: on
+            else:
+                # fmt: off
+                wf.connect([
+                    (buffer_nodes.bold_session[run_type], trans_Dbold_to_template, [("sdc_warp", "inputnode.Dboldtemplate_sdc_warp")]),
+                    (buffer_nodes.bold_session_template_reg, trans_Dbold_to_template, [(f"bold_session_{run_type}_to_bold_session_template_reg", "inputnode.UDbold_to_UDboldtemplate_aff")]),
+                    (reg_UDboldtemplate_to_anat, trans_Dbold_to_template, [("outputnode.fsl_affine", "inputnode.UDboldtemplate_to_anat_aff")]),
+                ])
+                # fmt: on
 
             # fmt: off
             wf.connect([
@@ -364,9 +438,6 @@ def run():
                 ]),
                 (hmc, trans_Dbold_to_template, [("outputnode.hmc_mats", "inputnode.Dbold_hmc_affs")]),
                 (reg_Dbold_to_Dboldtemplate, trans_Dbold_to_template, [("outputnode.fsl_affine", "inputnode.Dbold_to_Dboldtemplate_aff")]),
-                (buffer_nodes.bold_session[run_type], trans_Dbold_to_template, [("sdc_warp", "inputnode.Dboldtemplate_sdc_warp")]),
-                (buffer_nodes.bold_session_template_reg, trans_Dbold_to_template, [(f"bold_session_{run_type}_to_bold_session_template_reg", "inputnode.UDbold_to_UDboldtemplate_aff")]),
-                (reg_UDboldtemplate_to_anat, trans_Dbold_to_template, [("outputnode.fsl_affine", "inputnode.UDboldtemplate_to_anat_aff")]),
                 (reg_anat_to_template, trans_Dbold_to_template, [("outputnode.fsl_warp", "inputnode.anat_to_template_warp")]),
             ])
             # fmt: on
