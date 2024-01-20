@@ -41,6 +41,10 @@ def setup_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--force_isotropic", default=None, type=float, help="Force isotropic resampling to a specified resolution."
+    )
+
+    parser.add_argument(
         "--force_anat",
         default=None,
         type=str,

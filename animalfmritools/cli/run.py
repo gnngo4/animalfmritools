@@ -34,6 +34,7 @@ from animalfmritools.workflows.bold.boldref import init_bold_ref_wf
 from animalfmritools.workflows.bold.confounds import init_bold_confs_wf
 from animalfmritools.workflows.bold.hmc import init_bold_hmc_wf
 from animalfmritools.workflows.bold.sdc import init_bold_sdc_wf
+from animalfmritools.workflows.bold.surface_mapping import init_bold_surf_wf
 from animalfmritools.workflows.derivatives.base_outputs import (
     get_source_files as get_base_source_files,
 )
@@ -58,7 +59,6 @@ from animalfmritools.workflows.registration.transforms import (
 )
 
 RESCALE_FACTOR = 10  # Scale voxel sizes by 10 so that some neuroimaging tools will work for animals
-TEMPLATE_THRESHOLDING = 5
 
 
 def run():
@@ -301,9 +301,41 @@ def run():
                 ])
                 # fmt: on
 
-    # Regrid anat and template
-    regrid_anat_to_bold = init_regrid_anat_to_bold_wf(name="regrid_anat_to_bold_wf")
-    regrid_template_to_bold = init_regrid_template_to_bold_wf(name="regrid_template_to_bold_wf")
+    # Regrid anat
+    regrid_anat_to_bold = init_regrid_anat_to_bold_wf(regrid_to_bold=False, name="regrid_anat_to_bold_wf")
+
+    # Regrid template
+    if args.force_isotropic is not None:
+        # TODO: clean up
+        from nipype.interfaces.fsl import FLIRT
+        from nipype.interfaces.utility import Function
+
+        from animalfmritools.interfaces.functions import get_translation_component_from_nifti
+
+        flirt_iso = pe.Node(FLIRT(apply_isoxfm=args.force_isotropic), name="template_force_isotropic")
+        get_trans_component = pe.Node(
+            interface=Function(
+                input_names=["nifti_path"], output_names=["translation"], function=get_translation_component_from_nifti
+            ),
+            name="template_get_translation",
+        )
+        wf.connect(
+            [
+                (
+                    reorient_template,
+                    flirt_iso,
+                    [
+                        ("out_file", "in_file"),
+                        ("out_file", "reference"),
+                    ],
+                ),
+                (flirt_iso, get_trans_component, [("out_file", "nifti_path")]),
+            ]
+        )
+        args.force_isotropic *= RESCALE_FACTOR
+    regrid_template_to_bold = init_regrid_template_to_bold_wf(
+        force_isotropic=args.force_isotropic, name="regrid_template_to_bold_wf"
+    )
 
     # fmt: off
     wf.connect([
@@ -475,6 +507,36 @@ def run():
             ])
             # fmt: on
 
+            # Reverse scaling of BOLD
+            reverse_rescaling = pe.Node(
+                RescaleNifti(rescale_factor=1 / RESCALE_FACTOR),
+                name=f"{prefix}_bold_reverse_rescale",
+            )
+            if args.force_isotropic is not None:
+                # fmt: off
+                wf.connect([
+                    (get_trans_component, reverse_rescaling, [("translation", "force_translation")]),
+                ])
+                # fmt: on
+
+            # Surface projection of BOLD
+            surface_projection = init_bold_surf_wf(metadata, name=f"{prefix}_bold_surface_mapping")
+            # fmt: off
+            wf.connect([
+                (reverse_rescaling, surface_projection, [("rescaled_path", "inputnode.bold_nifti")]),
+                (buffer_nodes.surfaces, surface_projection, [
+                    ("lh_midthickness", "inputnode.lh_midthickness"),
+                    ("rh_midthickness", "inputnode.rh_midthickness"),
+                    ("lh_white", "inputnode.lh_white"),
+                    ("rh_white", "inputnode.rh_white"),
+                    ("lh_pial", "inputnode.lh_pial"),
+                    ("rh_pial", "inputnode.rh_pial"),
+                    ("lh_cortex", "inputnode.lh_cortex"),
+                    ("rh_cortex", "inputnode.rh_cortex"),
+                ]),
+            ])
+            # fmt: on
+
             # Save bold (run-level) outputs
             bold_info = parse_bold_path(bold_path)
             deriv_outputs = get_bold_source_files(bold_info, wf_manager.deriv_dir)
@@ -482,14 +544,12 @@ def run():
                 deriv_outputs,
                 name=f"{prefix}_bold_derivatives",
             )
-            reverse_rescaling = pe.Node(
-                RescaleNifti(rescale_factor=1 / RESCALE_FACTOR),
-                name=f"{prefix}_bold_reverse_rescale",
-            )
+
             # fmt: off
             wf.connect([
                 (trans_Dbold_to_template, reverse_rescaling, [("outputnode.bold_template_space", "nifti_path")]),
                 (reverse_rescaling, bold_deriv_wf, [("rescaled_path", "inputnode.bold_preproc")]),
+                (surface_projection, bold_deriv_wf, [("outputnode.bold_dtseries", "inputnode.bold_preproc_dtseries")]),
                 (bold_confs_wf, bold_deriv_wf, [
                     (("outputnode.confounds_metadata", jsonify), "inputnode.bold_confounds_metadata"),
                     ("outputnode.confounds_file", "inputnode.bold_confounds"),

@@ -1,5 +1,7 @@
 import os
 
+import nibabel as nib
+import numpy as np
 from nipype.interfaces.base import (
     File,
     SimpleInterface,
@@ -10,27 +12,22 @@ from nipype.interfaces.base import (
 OUTPATH = "rescaled.nii.gz"
 
 
-def _RescaleNifti(nifti_path, rescale_factor, out_path=OUTPATH):
-    import nibabel as nib
-    import numpy as np
-
+def _RescaleNifti(nifti_path, rescale_factor, force_translation=None, out_path=OUTPATH):
     # Load nifti
     img = nib.load(nifti_path)
-    header = img.header
+    header = img.header.copy()
 
-    # create a copy not a view, so it does not change if original changed
+    # Create copy of qform and sform codes
     qformcode = header["qform_code"].copy()
     sformcode = header["sform_code"].copy()
 
-    # now to augment the image you need to change both the sform and the qform
-    # augmenting pixidm, will change the qform
-    header["pixdim"][1:4] = header["pixdim"][1:4] * rescale_factor
+    # Apply a rescale factor to pixel dimensions
+    header["pixdim"][1:4] *= rescale_factor
 
-    # augmenting the affine, will change the sform
-    # !!! YOU NEED TO CHANGE THAT BASED ON YOUR ORIENTATION
-    img.affine[0][0] = img.affine[0][0] * rescale_factor
-    img.affine[1][1] = img.affine[1][1] * rescale_factor
-    img.affine[2][2] = img.affine[2][2] * rescale_factor
+    # Apply rescale factor to affine matrix diagonal elements
+    img.affine[0][0] *= rescale_factor
+    img.affine[1][1] *= rescale_factor
+    img.affine[2][2] *= rescale_factor
 
     # set q and sformcode (does not help) that's why I reimport
     header["qform_code"] = qformcode
@@ -56,6 +53,9 @@ def _RescaleNifti(nifti_path, rescale_factor, out_path=OUTPATH):
     values_aug = np.array(img_aug.get_fdata())
     new_img_aug = nib.Nifti1Image(values_aug, img_aug.affine, header_aug)
 
+    if force_translation is not None:
+        new_img_aug.affine[:3, 3] = force_translation
+
     # you save the image with the same name to overwrite it
     nib.save(new_img_aug, out_path)
 
@@ -63,6 +63,7 @@ def _RescaleNifti(nifti_path, rescale_factor, out_path=OUTPATH):
 class RescaleNiftiInputSpec(TraitedSpec):
     nifti_path = File(exists=True, desc="nifti path", mandatory=True)
     rescale_factor = traits.Float(desc="rescale factor", mandatory=True)
+    force_translation = traits.Any(None, usedefault=True, desc="Update affine with a translation component")
 
 
 class RescaleNiftiOutputSpec(TraitedSpec):
@@ -77,6 +78,7 @@ class RescaleNifti(SimpleInterface):
         _RescaleNifti(
             self.inputs.nifti_path,
             self.inputs.rescale_factor,
+            self.inputs.force_translation,
         )
 
         return runtime

@@ -13,6 +13,7 @@ class BufferNodes:
         self,
         anat: pe.Node,
         template: pe.Node,
+        surfaces: pe.Node,
         bold: Dict[str, pe.Node],
         bold_inputs: Dict[str, List[str]],
         fmap: Dict[str, pe.Node],
@@ -23,6 +24,7 @@ class BufferNodes:
     ) -> None:
         self.anat = anat
         self.template = template
+        self.surfaces = surfaces
         self.bold = bold
         self.bold_inputs = bold_inputs
         self.fmap = fmap
@@ -64,6 +66,27 @@ def setup_buffer_nodes(wf_manager: WorkflowManager) -> BufferNodes:
     template_buffer.inputs.wm = wf_manager.template["White"]
     template_buffer.inputs.csf = wf_manager.template["CSF"]
 
+    # Surface buffer
+    surface_inputs = [
+        "lh_midthickness",
+        "rh_midthickness",
+        "lh_white",
+        "rh_white",
+        "lh_pial",
+        "rh_pial",
+        "lh_cortex",
+        "rh_cortex",
+    ]
+    surface_buffer = pe.Node(niu.IdentityInterface(surface_inputs), name="surface_buffer")
+    surface_buffer.inputs.lh_midthickness = wf_manager.surfaces["lh_midthickness"]
+    surface_buffer.inputs.rh_midthickness = wf_manager.surfaces["rh_midthickness"]
+    surface_buffer.inputs.lh_white = wf_manager.surfaces["lh_white"]
+    surface_buffer.inputs.rh_white = wf_manager.surfaces["rh_white"]
+    surface_buffer.inputs.lh_pial = wf_manager.surfaces["lh_pial"]
+    surface_buffer.inputs.rh_pial = wf_manager.surfaces["rh_pial"]
+    surface_buffer.inputs.lh_cortex = wf_manager.surfaces["lh_cortex"]
+    surface_buffer.inputs.rh_cortex = wf_manager.surfaces["rh_cortex"]
+
     # bold - run-level - buffers
     bold_buffer, bold_buffer_inputs = get_run_level_buffer_nodes(wf_manager.bold_runs, "bold")
 
@@ -96,6 +119,7 @@ def setup_buffer_nodes(wf_manager: WorkflowManager) -> BufferNodes:
     buffer_nodes = BufferNodes(
         anat=anat_buffer,
         template=template_buffer,
+        surfaces=surface_buffer,
         bold=bold_buffer,
         bold_inputs=bold_buffer_inputs,
         fmap=fmap_buffer,

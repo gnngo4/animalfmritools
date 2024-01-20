@@ -6,8 +6,12 @@ from pydantic import BaseModel
 from animalfmritools.utils.data_grabber import BidsReader
 
 TEMPLATE_DIR = {
-    "MouseABA": Path("/opt/animalfmritools/animalfmritools/data_template/MouseABA"),  # Mouse
-    "MBM_v3.0.1": Path("/opt/animalfmritools/animalfmritools/data_template/MBM_v3.0.1"),  # Marmoset
+    "mouse": Path("/opt/animalfmritools/animalfmritools/data_template/mouse/template"),  # ABAv3
+    "marmoset": Path("/opt/animalfmritools/animalfmritools/data_template/marmoset/template"),  # MBMv4
+}
+SURFACE_DIR = {
+    "mouse": Path("/opt/animalfmritools/animalfmritools/data_template/mouse/surfaces/3k"),  # ABAv3
+    "marmoset": Path("/opt/animalfmritools/animalfmritools/data_template/marmoset/surfaces/10k"),  # MBMv4
 }
 
 
@@ -21,25 +25,46 @@ class WorkflowManager(BaseModel):
     bold_runs: Dict[str, List[Path]]
     fmap_runs: Dict[str, List[Path]]
     template: Dict[str, Path]
+    surfaces: Dict[str, Path]
 
 
 def get_template_data(species_id: str) -> Dict[str, Path]:
     assert species_id in ["marmoset", "mouse"]
+    template_base_dir = TEMPLATE_DIR[species_id]
+    surface_base_dir = SURFACE_DIR[species_id]
     if species_id == "mouse":
-        base_dir = TEMPLATE_DIR["MouseABA"]
         template = {
-            "Base": base_dir / "TMBTA_space-P56_downsample2.nii.gz",
-            "CSF": base_dir / "rois" / "pipeline_vs.nii.gz",
-            "Grey": base_dir / "rois" / "pipeline_gm.nii.gz",
-            "White": base_dir / "rois" / "pipeline_wm.nii.gz",
+            "Base": template_base_dir / "TMBTA_space-P56_downsample2.nii.gz",
+            "CSF": template_base_dir / "rois" / "pipeline_vs.nii.gz",
+            "Grey": template_base_dir / "rois" / "pipeline_gm.nii.gz",
+            "White": template_base_dir / "rois" / "pipeline_wm.nii.gz",
+        }
+        surfaces = {
+            "lh_midthickness": surface_base_dir / "ABAv3.lh.midthickness.3k.surf.gii",
+            "rh_midthickness": surface_base_dir / "ABAv3.rh.midthickness.3k.surf.gii",
+            "lh_white": surface_base_dir / "ABAv3.lh.white.3k.surf.gii",
+            "rh_white": surface_base_dir / "ABAv3.rh.white.3k.surf.gii",
+            "lh_pial": surface_base_dir / "ABAv3.lh.pial.3k.surf.gii",
+            "rh_pial": surface_base_dir / "ABAv3.rh.pial.3k.surf.gii",
+            "lh_cortex": surface_base_dir / "cortex.lh.func.gii",
+            "rh_cortex": surface_base_dir / "cortex.rh.func.gii",
         }
     elif species_id == "marmoset":
-        base_dir = TEMPLATE_DIR["MBM_v3.0.1"]
         template = {
-            "Base": base_dir / "template_T2w_brain.nii.gz",
-            "CSF": base_dir / "pipeline_csf.nii.gz",
-            "Grey": base_dir / "pipeline_gm.nii.gz",
-            "White": base_dir / "pipeline_wm.nii.gz",
+            "Base": template_base_dir / "template_T2w_brain.nii.gz",
+            "CSF": template_base_dir / "pipeline_csf.nii.gz",
+            "Grey": template_base_dir / "pipeline_gm.nii.gz",
+            "White": template_base_dir / "pipeline_wm.nii.gz",
+        }
+        surfaces = {
+            "lh_midthickness": surface_base_dir / "surfFS.lh.graymid.10k.surf.gii",
+            "rh_midthickness": surface_base_dir / "surfFS.rh.graymid.10k.surf.gii",
+            "lh_white": surface_base_dir / "surfFS.lh.white.10k.surf.gii",
+            "rh_white": surface_base_dir / "surfFS.rh.white.10k.surf.gii",
+            "lh_pial": surface_base_dir / "surfFS.lh.pial.10k.surf.gii",
+            "rh_pial": surface_base_dir / "surfFS.rh.pial.10k.surf.gii",
+            "lh_cortex": surface_base_dir / "cortex.lh.func.gii",
+            "rh_cortex": surface_base_dir / "cortex.rh.func.gii",
         }
     else:
         raise ValueError(f"{species_id} not implemented")
@@ -47,7 +72,10 @@ def get_template_data(species_id: str) -> Dict[str, Path]:
     for k, v in template.items():
         assert v.exists(), f"[{k}] Path: {v} does not exist."
 
-    return template
+    for k, v in surfaces.items():
+        assert v.exists(), f"[{k}] Path: {v} does not exist."
+
+    return template, surfaces
 
 
 def setup_workflow(
@@ -61,6 +89,9 @@ def setup_workflow(
     anat_contrast_type: str = "T2w",
 ) -> WorkflowManager:
     bids_reader = BidsReader(bids_dir)
+
+    template, surfaces = get_template_data(species_id)
+
     data = {
         "sub_id": sub_id,
         "ses_id": ses_id,
@@ -70,7 +101,8 @@ def setup_workflow(
         "anat": bids_reader.get_anat(sub_id, ses_id=ses_id, force_anat=force_anat, contrast_type=anat_contrast_type),
         "bold_runs": bids_reader.get_bold_runs(sub_id, ses_id, ignore_tasks=[]),
         "fmap_runs": bids_reader.get_fmap_runs(sub_id, ses_id),
-        "template": get_template_data(species_id),
+        "template": template,
+        "surfaces": surfaces,
     }
 
     # Verbose; debug
