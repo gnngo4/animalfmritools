@@ -509,7 +509,6 @@ freesurfer/bin/mris_longitudinal_surfaces
 freesurfer/bin/mris_make_average_surface
 freesurfer/bin/mris_make_face_parcellation
 freesurfer/bin/mris_make_map_surfaces
-freesurfer/bin/mris_make_surfaces
 freesurfer/bin/mris_make_template
 freesurfer/bin/mris_map_cuts
 freesurfer/bin/mris_mef_surfaces

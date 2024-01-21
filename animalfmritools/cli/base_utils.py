@@ -35,9 +35,9 @@ def get_template_data(species_id: str) -> Dict[str, Path]:
     if species_id == "mouse":
         template = {
             "Base": template_base_dir / "TMBTA_space-P56_downsample2.nii.gz",
-            "CSF": template_base_dir / "rois" / "pipeline_vs.nii.gz",
-            "Grey": template_base_dir / "rois" / "pipeline_gm.nii.gz",
-            "White": template_base_dir / "rois" / "pipeline_wm.nii.gz",
+            "CSF": template_base_dir / "pipeline_vs.nii.gz",
+            "Grey": template_base_dir / "pipeline_gm.nii.gz",
+            "White": template_base_dir / "pipeline_wm.nii.gz",
         }
         surfaces = {
             "lh_midthickness": surface_base_dir / "ABAv3.lh.midthickness.3k.surf.gii",

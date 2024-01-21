@@ -1,20 +1,21 @@
-FROM ubuntu:jammy-20230308
+FROM ubuntu:latest
 
-ENV DEBIAN_FRONTEND="noninteractive"
+ENV DEBIAN_FRONTEND="noninteractive" \
+    LANG="C.UTF-8" \
+    LC_ALL="C.UTF-8"
 
-#RUN apt-get -o Acquire::Check-Valid-Until=false -o Acquire::Check-Date=false update -y && apt upgrade -y && \
-RUN apt-get update -y && apt upgrade -y && \
+RUN apt-get update -y && \
+    apt-get upgrade -y && \
+    apt-get dist-upgrade -y && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
-        wget \
         curl \
         unzip \
-        tree \
         libxt-dev && \
     apt-get clean && \
-    apt-get autoremove && \
+    apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
-    
+
 # Installing freesurfer
 COPY docker/files/freesurfer7.2-exclude.txt /usr/local/etc/freesurfer7.2-exclude.txt
 RUN curl -sSL https://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/7.2.0/freesurfer-linux-ubuntu18_amd64-7.2.0.tar.gz \
@@ -40,19 +41,6 @@ ENV PERL5LIB="$MINC_LIB_DIR/perl5/5.8.5" \
 
 # Copy license.txt
 COPY docker/files/freesurfer_license.txt /opt/freesurfer/license.txt
-
-# mri_synthstrip 1.3
-RUN apt-get update -y && apt upgrade -y && \
-    apt-get install -y --no-install-recommends \
-        build-essential python3-dev
-RUN fspython -m pip install torch==1.10.2
-RUN fspython -m pip install surfa==0.3.3
-RUN mkdir -p /opt/synthstrip
-COPY --from=freesurfer/synthstrip:1.3 /freesurfer/mri_synthstrip /opt/synthstrip
-COPY --from=freesurfer/synthstrip:1.3 /freesurfer/models/synthstrip.*.pt /opt/freesurfer/models/
-
-# Replace recon-all (https://github.com/freesurfer/freesurfer/issues/892)
-COPY docker/files/recon-all.edit /opt/freesurfer/bin/recon-all
 
 # FSL 6.0.5.1
 RUN apt-get update -y && apt upgrade -y && \
@@ -200,13 +188,13 @@ ENV PATH="/opt/workbench/bin_linux64:$PATH" \
 
 RUN ldconfig
 
-# Python 3.10 and pipenv
+# Setup pipenv
 RUN apt-get update -y && apt upgrade -y && \
     apt-get install -y --no-install-recommends \
-        python3.10 \
         python3-pip && \
     pip install pipenv
 
+# Install dependencies
 WORKDIR /opt/animalfmritools
 COPY ["Pipfile.lock", "/opt/animalfmritools"]
 COPY ["Pipfile", "/opt/animalfmritools"]
@@ -215,4 +203,5 @@ RUN ["pipenv", "install", "--deploy", "--system", "--ignore-pipfile"]
 
 WORKDIR /opt
 
+# Run
 ENTRYPOINT ["python3", "/opt/animalfmritools/animalfmritools/cli/run.py"]
