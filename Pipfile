@@ -4,27 +4,26 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-jupyterlab = "*"
-fmriprep = "*"
 numpy = "*"
 nibabel = "*"
+pandas = "*"
+pyarrow = "*"
+jupyterlab = "*"
+pydantic = "*"
 nilearn = "*"
 niworkflows = "*"
-pydicom = "*"
-pybids = "*"
-pandas = "*"
 matplotlib = "*"
+dvc = "*"
 nipype = "*"
-pydantic = "*"
+fmriprep = "*"
 fslpy = "*"
-dvc = {extras = ["all"], version = "*"}
 
 [dev-packages]
 ruff = "*"
-black = {extras = ["jupyter"], version = "*"}
+black = "*"
 pytest = "*"
 pre-commit = "*"
 
 [requires]
 python_version = "3.10"
-python_full_version = "3.10.6"
+python_full_version = "3.10.12"
