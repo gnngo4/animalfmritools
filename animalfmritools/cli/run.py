@@ -65,11 +65,11 @@ def run():
     parser = setup_parser()
     args = parser.parse_args()
 
-    if isinstance(args.force_anat, str):
-        force_anat = Path(args.force_anat)
-        assert force_anat.exists(), f"{force_anat} does not exist."
-    else:
-        force_anat = args.force_anat
+    force_anat = Path(args.force_anat) if isinstance(args.force_anat, str) else args.force_anat
+
+    use_anat_to_guide = args.use_anat_to_guide
+    if args.use_anat_to_guide and not args.force_anat:
+        raise ValueError("--force_anat <anat_path> must be set.")
 
     # Subject info
     wf_manager = setup_workflow(
@@ -80,6 +80,7 @@ def run():
         args.out_dir,
         args.scratch_dir,
         force_anat=force_anat,
+        use_anat_to_guide=use_anat_to_guide,
         anat_contrast_type=args.anat_contrast,
     )
 
@@ -95,8 +96,8 @@ def run():
     """
     Rescale anat and template
     """
-    reorient_anat = pe.Node(Reorient2Std(), name="reorient_anat")
-    rescale_anat = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_anat")
+    reorient_anat_template = pe.Node(Reorient2Std(), name="reorient_anat_template")
+    rescale_anat_template = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_anat_template")
     reorient_template = pe.Node(Reorient2Std(), name="reorient_template")
     reorient_template_gm = pe.Node(Reorient2Std(), name="reorient_template_gm")
     reorient_template_wm = pe.Node(Reorient2Std(), name="reorient_template_wm")
@@ -106,10 +107,11 @@ def run():
     rescale_template_wm = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_template_wm")
     rescale_template_csf = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_template_csf")
 
+    assert "anat_template" in buffer_nodes.anat.keys()
     # fmt: off
     wf.connect([
-        (buffer_nodes.anat, reorient_anat, [("t2w", "in_file")]),
-        (reorient_anat, rescale_anat, [("out_file", "nifti_path")]),
+        (buffer_nodes.anat["anat_template"], reorient_anat_template, [("anat", "in_file")]),
+        (reorient_anat_template, rescale_anat_template, [("out_file", "nifti_path")]),
         (buffer_nodes.template, reorient_template, [("template", "in_file")]),
         (reorient_template, rescale_template, [("out_file", "nifti_path")]),
         (buffer_nodes.template, reorient_template_gm, [("gm", "in_file")]),
@@ -259,7 +261,9 @@ def run():
         first_dir_type,
         all_dir_types,
     )
-    base_deriv_wf = init_base_preproc_derivatives_wf(deriv_outputs, name="base_derivatives", no_sdc=no_sdc)
+    base_deriv_wf = init_base_preproc_derivatives_wf(
+        deriv_outputs, name="base_derivatives", no_sdc=no_sdc, use_anat_to_guide=use_anat_to_guide
+    )
 
     """
     Register all `sdc_bold`  to the first run_type
@@ -302,7 +306,9 @@ def run():
                 # fmt: on
 
     # Regrid anat
-    regrid_anat_to_bold = init_regrid_anat_to_bold_wf(regrid_to_bold=False, name="regrid_anat_to_bold_wf")
+    regrid_anat_template_to_bold = init_regrid_anat_to_bold_wf(
+        regrid_to_bold=False, name="regrid_anat_template_to_bold_wf"
+    )
 
     # Regrid template
     if args.force_isotropic is not None:
@@ -319,19 +325,15 @@ def run():
             ),
             name="template_get_translation",
         )
-        wf.connect(
-            [
-                (
-                    reorient_template,
-                    flirt_iso,
-                    [
-                        ("out_file", "in_file"),
-                        ("out_file", "reference"),
-                    ],
-                ),
-                (flirt_iso, get_trans_component, [("out_file", "nifti_path")]),
-            ]
-        )
+        # fmt: off
+        wf.connect([
+            (reorient_template, flirt_iso, [
+                ("out_file", "in_file"),
+                ("out_file", "reference"),
+            ]),
+            (flirt_iso, get_trans_component, [("out_file", "nifti_path")]),
+        ])
+        # fmt: on
         args.force_isotropic *= RESCALE_FACTOR
     regrid_template_to_bold = init_regrid_template_to_bold_wf(
         force_isotropic=args.force_isotropic, name="regrid_template_to_bold_wf"
@@ -339,8 +341,8 @@ def run():
 
     # fmt: off
     wf.connect([
-        (buffer_nodes.bold_session_template, regrid_anat_to_bold, [("bold_session_template", "inputnode.bold")]),
-        (rescale_anat, regrid_anat_to_bold, [("rescaled_path", "inputnode.anat")]),
+        (buffer_nodes.bold_session_template, regrid_anat_template_to_bold, [("bold_session_template", "inputnode.bold")]),
+        (rescale_anat_template, regrid_anat_template_to_bold, [("rescaled_path", "inputnode.anat")]),
         (buffer_nodes.bold_session_template, regrid_template_to_bold, [("bold_session_template", "inputnode.bold")]),
         (rescale_template, regrid_template_to_bold, [("rescaled_path", "inputnode.template")]),
         (rescale_template_gm, regrid_template_to_bold, [("rescaled_path", "inputnode.template_gm")]),
@@ -362,51 +364,27 @@ def run():
     reg_UDboldtemplate_to_anat = None
     if no_sdc:
         reg_Dboldtemplate_to_anat = init_reg_Dboldtemplate_to_anat_wf(name="reg_Dboldtemplate_to_anat")
-        wf.connect(
-            [
-                (
-                    buffer_nodes.bold[first_dir_type],
-                    reg_Dboldtemplate_to_anat,
-                    [(session_bold_run_input, "inputnode.Dboldtemplate_run")],
-                ),
-                (reg_anat_to_template, reg_Dboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")]),
-                (
-                    reg_Dboldtemplate_to_anat,
-                    base_deriv_wf,
-                    [("outputnode.out_report", "inputnode.reg_from_Dboldtemplate_to_anat")],
-                ),
-            ]
-        )
+        # fmt: off
+        wf.connect([
+            (buffer_nodes.bold[first_dir_type], reg_Dboldtemplate_to_anat, [(session_bold_run_input, "inputnode.Dboldtemplate_run")]),
+            (reg_anat_to_template, reg_Dboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")]),
+            (reg_Dboldtemplate_to_anat, base_deriv_wf, [("outputnode.out_report", "inputnode.reg_from_Dboldtemplate_to_anat")]),
+        ])
+        # fmt: on
     else:
         reg_UDboldtemplate_to_anat = init_reg_UDboldtemplate_to_anat_wf(name="reg_UDboldtemplate_to_anat_wf")
-        wf.connect(
-            [
-                (
-                    buffer_nodes.bold[first_dir_type],
-                    reg_UDboldtemplate_to_anat,
-                    [(session_bold_run_input, "inputnode.Dboldtemplate_run")],
-                ),
-                (
-                    buffer_nodes.bold_session[first_dir_type],
-                    reg_UDboldtemplate_to_anat,
-                    [("sdc_warp", "inputnode.Dboldtemplate_sdc_warp")],
-                ),
-                (
-                    reg_anat_to_template,
-                    reg_UDboldtemplate_to_anat,
-                    [("outputnode.anat_brain", "inputnode.masked_anat")],
-                ),
-                (
-                    reg_UDboldtemplate_to_anat,
-                    base_deriv_wf,
-                    [("outputnode.out_report", "inputnode.reg_from_UDboldtemplate_to_anat")],
-                ),
-            ]
-        )
+        # fmt: off
+        wf.connect([
+            (buffer_nodes.bold[first_dir_type], reg_UDboldtemplate_to_anat, [(session_bold_run_input, "inputnode.Dboldtemplate_run")]),
+            (buffer_nodes.bold_session[first_dir_type], reg_UDboldtemplate_to_anat, [("sdc_warp", "inputnode.Dboldtemplate_sdc_warp")]),
+            (reg_anat_to_template, reg_UDboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")]),
+            (reg_UDboldtemplate_to_anat, base_deriv_wf, [("outputnode.out_report", "inputnode.reg_from_UDboldtemplate_to_anat")]),
+        ])
+        # fmt: on
 
     # fmt: off
     wf.connect([
-        (regrid_anat_to_bold, reg_anat_to_template, [("outputnode.regridded_anat", "inputnode.anat")]),
+        (regrid_anat_template_to_bold, reg_anat_to_template, [("outputnode.regridded_anat", "inputnode.anat")]),
         (regrid_template_to_bold, reg_anat_to_template, [("outputnode.regridded_template", "inputnode.template")]),
         (reg_anat_to_template, base_deriv_wf, [
             ("outputnode.init_out_report", "inputnode.reg_from_anat_to_template_init"),
@@ -414,6 +392,51 @@ def run():
         ]),
     ])
     # fmt: on
+
+    if use_anat_to_guide:
+        assert "anat_native" in buffer_nodes.anat.keys() and "anat_template" in buffer_nodes.anat.keys()
+        reorient_anat_native = pe.Node(Reorient2Std(), name="reorient_anat_native")
+        rescale_anat_native = pe.Node(RescaleNifti(rescale_factor=RESCALE_FACTOR), name="rescale_anat_native")
+        regrid_anat_native_to_bold = init_regrid_anat_to_bold_wf(
+            regrid_to_bold=False, name="regrid_anat_native_to_bold_wf"
+        )
+        reg_anat_native_to_template = init_reg_anat_to_template_wf(
+            TEMPLATE_THRESHOLDING, name="reg_anat_native_to_template_wf"
+        )
+        reg_anat_native_to_anat_template = init_reg_anat_to_template_wf(
+            0, skullstrip_anat=False, name="reg_anat_native_to_anat_template_wf"
+        )
+
+        # fmt: off
+        wf.connect([
+            (buffer_nodes.anat["anat_native"], reorient_anat_native, [("anat", "in_file")]),
+            (reorient_anat_native, rescale_anat_native, [("out_file", "nifti_path")]),
+            (buffer_nodes.bold_session_template, regrid_anat_native_to_bold, [("bold_session_template", "inputnode.bold")]),
+            (rescale_anat_native, regrid_anat_native_to_bold, [("rescaled_path", "inputnode.anat")]),
+            (regrid_anat_native_to_bold, reg_anat_native_to_template, [("outputnode.regridded_anat", "inputnode.anat")]),
+            (regrid_template_to_bold, reg_anat_native_to_template, [("outputnode.regridded_template", "inputnode.template")]),
+            (reg_anat_native_to_template, reg_anat_native_to_anat_template, [("outputnode.anat_brain", "inputnode.anat")]),
+            (reg_anat_to_template, reg_anat_native_to_anat_template, [("outputnode.anat_brain", "inputnode.template")]),
+            (reg_anat_native_to_anat_template, base_deriv_wf, [
+                ("outputnode.init_out_report", "inputnode.reg_from_anatnative_to_anat_init"),
+                ("outputnode.out_report", "inputnode.reg_from_anatnative_to_anat"),
+            ]),
+        ])
+        # fmt: on
+
+        # Link anat (not skullstripped) image to `regUDboldtemplate_to_anat/reg_Dboldtemplate_to_anat`
+        if no_sdc:
+            # fmt: off
+            wf.disconnect([(reg_anat_to_template, reg_Dboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")])])
+            wf.connect([(reg_anat_native_to_template, reg_Dboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")])])
+            # wf.connect([(regrid_anat_native_to_bold, reg_Dboldtemplate_to_anat, [("outputnode.regridded_anat", "inputnode.masked_anat")])])
+            # fmt: on
+        else:
+            # fmt: off
+            wf.disconnect([(reg_anat_to_template, reg_UDboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")])])
+            wf.connect([(reg_anat_native_to_template, reg_UDboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")])])
+            # wf.connect([(regrid_anat_native_to_bold, reg_UDboldtemplate_to_anat, [("outputnode.regridded_anat", "inputnode.masked_anat")])])
+            # fmt: on
 
     # Process each run
     for run_type, _bold_buffer in buffer_nodes.bold.items():
@@ -442,7 +465,10 @@ def run():
                 n4_reg_flag=True, name=f"{prefix}_reg_Dbold_to_Dboldtemplate"
             )
             trans_Dbold_to_template = init_trans_bold_to_template_wf(
-                no_sdc=no_sdc, reg_quick=args.reg_quick, name=f"{prefix}_transform_Dbold_to_template"
+                no_sdc=no_sdc,
+                reg_quick=args.reg_quick,
+                use_anat_to_guide=use_anat_to_guide,
+                name=f"{prefix}_transform_Dbold_to_template",
             )
 
             if no_sdc:
@@ -468,12 +494,8 @@ def run():
                 (boldref, reg_Dbold_to_Dboldtemplate, [("outputnode.boldref", "inputnode.Dbold")]),
                 (buffer_nodes.bold_session[run_type], reg_Dbold_to_Dboldtemplate, [("distorted_bold", "inputnode.Dboldtemplate")]),
                 (_bold_buffer, trans_Dbold_to_template, [(bold_input, "inputnode.bold")]),
-                (regrid_anat_to_bold, trans_Dbold_to_template, [
-                    ("outputnode.regridded_anat", "inputnode.regridded_anat"),
-                ]),
-                (regrid_template_to_bold, trans_Dbold_to_template, [
-                    ("outputnode.regridded_template", "inputnode.regridded_template"),
-                ]),
+                (regrid_anat_template_to_bold, trans_Dbold_to_template, [("outputnode.regridded_anat", "inputnode.regridded_anat")]),
+                (regrid_template_to_bold, trans_Dbold_to_template, [("outputnode.regridded_template", "inputnode.regridded_template")]),
                 (hmc, trans_Dbold_to_template, [("outputnode.hmc_mats", "inputnode.Dbold_hmc_affs")]),
                 (reg_Dbold_to_Dboldtemplate, trans_Dbold_to_template, [("outputnode.fsl_affine", "inputnode.Dbold_to_Dboldtemplate_aff")]),
                 (reg_anat_to_template, trans_Dbold_to_template, [("outputnode.fsl_warp", "inputnode.anat_to_template_warp")]),
@@ -558,6 +580,15 @@ def run():
                 (reg_Dbold_to_Dboldtemplate, bold_deriv_wf, [("outputnode.out_report", "inputnode.reg_from_Dbold_to_Dboldtemplate")]),
             ])
             # fmt: on
+
+            if use_anat_to_guide:
+                # fmt: off
+                wf.disconnect([(regrid_anat_template_to_bold, trans_Dbold_to_template, [("outputnode.regridded_anat", "inputnode.regridded_anat")])])
+                wf.connect([
+                    (regrid_anat_native_to_bold, trans_Dbold_to_template, [("outputnode.regridded_anat", "inputnode.regridded_anat")]),
+                    (reg_anat_native_to_anat_template, trans_Dbold_to_template, [("outputnode.fsl_warp", "inputnode.anat_native_to_anat_secondary_warp")]),
+                ])
+                # fmt: on
 
     wf.run()
 

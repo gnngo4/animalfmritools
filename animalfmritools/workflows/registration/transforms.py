@@ -278,46 +278,30 @@ def init_reg_UDboldtemplate_to_anat_wf(name: str = "reg_UDboldtemplate_to_anat_w
     return workflow
 
 
-def init_reg_anat_to_template_wf(template_thr: float, name: str = "reg_anat_to_template_wf") -> Workflow:
+def init_reg_anat_to_template_wf(
+    template_thr: float, skullstrip_anat: bool = True, name: str = "reg_anat_to_template_wf"
+) -> Workflow:
     workflow = Workflow(name=name)
+
+    OUTPUTNODE_FIELDS = ["init_out_report", "out_report", "fsl_warp"]
+    if skullstrip_anat:
+        OUTPUTNODE_FIELDS.append("anat_brain")
 
     inputnode = pe.Node(
         niu.IdentityInterface(fields=["anat", "template"]),
         name="inputnode",
     )
 
-    outputnode = pe.Node(
-        niu.IdentityInterface(
-            fields=[
-                "anat_brain",
-                "init_out_report",
-                "out_report",
-                "fsl_warp",
-            ]
-        ),
-        name="outputnode",
-    )
-
-    # Brain extract anatomical
-    anat_1_initreg = pe.Node(
-        FLIRT(
-            dof=12,
-            searchr_x=[-180, 180],
-            searchr_y=[-180, 180],
-            searchr_z=[-180, 180],
-        ),
-        name="anat_1_initreg",
-    )
-    anat_2_genmask = pe.Node(Threshold(thresh=template_thr), name="anat_1_generate_mask")
-    anat_3_mask = pe.Node(ApplyMask(), name="anat_1_apply_mask")
+    outputnode = pe.Node(niu.IdentityInterface(fields=OUTPUTNODE_FIELDS), name="outputnode")
 
     # Register anat to template
+    searchr = [-180, 180]
     reg_anat_to_template_init = pe.Node(
         FLIRTRPT(
             dof=6,
-            searchr_x=[-180, 180],
-            searchr_y=[-180, 180],
-            searchr_z=[-180, 180],
+            searchr_x=searchr,
+            searchr_y=searchr,
+            searchr_z=searchr,
             generate_report=True,
         ),
         name="anat_to_template_init",
@@ -339,16 +323,41 @@ def init_reg_anat_to_template_wf(template_thr: float, name: str = "reg_anat_to_t
     merge_affines = pe.Node(ConvertXFM(concat_xfm=True), name="merge_affines")
     create_warp = pe.Node(ConvertWarp(relwarp=True), name="create_warp")
 
+    if skullstrip_anat:
+        # Brain extract anatomical
+        anat_1_initreg = pe.Node(
+            FLIRT(
+                dof=12,
+                searchr_x=[-180, 180],
+                searchr_y=[-180, 180],
+                searchr_z=[-180, 180],
+            ),
+            name="anat_1_initreg",
+        )
+        anat_2_genmask = pe.Node(Threshold(thresh=template_thr), name="anat_1_generate_mask")
+        anat_3_mask = pe.Node(ApplyMask(), name="anat_1_apply_mask")
+        # fmt: off
+        workflow.connect([
+            (inputnode, anat_1_initreg, [
+                ("template", "in_file"),
+                ("anat", "reference")
+            ]),
+            (anat_1_initreg, anat_2_genmask, [("out_file", "in_file")]),
+            (inputnode, anat_3_mask, [("anat", "in_file")]),
+            (anat_2_genmask, anat_3_mask, [("out_file", "mask_file")]),
+            (anat_3_mask, reg_anat_to_template_init, [("out_file", "in_file")]),
+            (anat_3_mask, outputnode, [("out_file", "anat_brain")]),
+        ])
+        # fmt: on
+    else:
+        # fmt: off
+        workflow.connect([
+            (inputnode, reg_anat_to_template_init, [("anat", "in_file")]),
+        ])
+        # fmt: on
+
     # fmt: off
     workflow.connect([
-        (inputnode, anat_1_initreg, [
-            ("template", "in_file"),
-            ("anat", "reference")
-        ]),
-        (anat_1_initreg, anat_2_genmask, [("out_file", "in_file")]),
-        (inputnode, anat_3_mask, [("anat", "in_file")]),
-        (anat_2_genmask, anat_3_mask, [("out_file", "mask_file")]),
-        (anat_3_mask, reg_anat_to_template_init, [("out_file", "in_file")]),
         (inputnode, reg_anat_to_template_init, [("template", "reference")]),
         (reg_anat_to_template_init, reg_anat_to_template, [("out_file", "moving_image")]),
         (inputnode, reg_anat_to_template, [("template", "fixed_image")]),
@@ -372,7 +381,6 @@ def init_reg_anat_to_template_wf(template_thr: float, name: str = "reg_anat_to_t
         (reg_anat_to_template_init, outputnode, [("out_report", "init_out_report")]),
         (report_anat_to_template, outputnode, [("out_report", "out_report")]),
         (create_warp, outputnode, [("out_file", "fsl_warp")]),
-        (anat_3_mask, outputnode, [("out_file", "anat_brain")]),
     ])
     # fmt: on
 

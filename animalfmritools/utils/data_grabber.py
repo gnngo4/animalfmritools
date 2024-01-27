@@ -61,39 +61,21 @@ class BidsReader(BidsReaderInput):
         sub_id: str,
         ses_id: Optional[str] = None,
         force_anat: Optional[Path] = None,
+        use_anat_to_guide: bool = False,
         contrast_type: str = "T2w",
-    ) -> Path:
-        if force_anat is not None and force_anat.exists():
-            print(f"Warning: Using {force_anat} as the anatomical image.")
-            return force_anat
+    ) -> Dict[str, Path]:
+        anat_native = self._find_last_t2w_run(sub_id, ses_id, contrast_type)
 
-        # If multiple T2w runs detected, grab the last one
-        runs: List[Path] = []
-        if ses_id is not None:
-            # Find a T2w given a subject and session ID
-            sub_ses_anat_dir = (
-                Path(self.bids_dir) / self._process_dir(sub_id, "sub") / self._process_dir(ses_id, "ses") / "anat"
-            )
-            for i in sub_ses_anat_dir.iterdir():
-                if not i.is_dir() and i.name.endswith(f"_{contrast_type}.nii.gz"):
-                    runs.append(i)
-            if runs == 0:
-                print(
-                    f"Warning: No runs detected in {sub_ses_anat_dir}.\nSearching for an anatomical across all sessions."
-                )
-                # Find a T2w given a subject ID
-                runs = self._find_t2w_across_sessions(sub_id, contrast_type=contrast_type)
-        else:
-            # Find a T2w given a subject ID
-            runs = self._find_t2w_across_sessions(sub_id, contrast_type=contrast_type)
+        if force_anat:
+            assert force_anat.exists(), f"--force_anat was set, but {force_anat} does not exist."
+            if use_anat_to_guide:
+                print(f"Warning: Alignment order: {anat_native} > {force_anat} > TEMPLATE.")
+                return {"anat_native": anat_native, "anat_template": force_anat}
+            else:
+                print(f"Warning: Using {force_anat} as the anatomical image.")
+                return {"anat_template": force_anat}
 
-        n_runs = len(runs)
-        assert n_runs > 0, "Warning: No runs were detected.\nExiting."
-
-        if n_runs > 1:
-            print(f"Warning: Multiple runs were detected, using {runs[-1].stem}")
-
-        return runs[-1]
+        return {"anat_template": anat_native}
 
     def get_bold_runs(
         self, sub_id: str, ses_id: str, ignore_tasks: Optional[List[str]] = None
@@ -158,6 +140,40 @@ class BidsReader(BidsReaderInput):
                 runs.sort()
 
         return runs_dict
+
+    def _find_last_t2w_run(
+        self,
+        sub_id: str,
+        ses_id: Optional[str] = None,
+        contrast_type: str = "T2w",
+    ) -> Path:
+        # If multiple T2w runs detected, grab the last one
+        runs: List[Path] = []
+        if ses_id is not None:
+            # Find a T2w given a subject and session ID
+            sub_ses_anat_dir = (
+                Path(self.bids_dir) / self._process_dir(sub_id, "sub") / self._process_dir(ses_id, "ses") / "anat"
+            )
+            for i in sub_ses_anat_dir.iterdir():
+                if not i.is_dir() and i.name.endswith(f"_{contrast_type}.nii.gz"):
+                    runs.append(i)
+            if runs == 0:
+                print(
+                    f"Warning: No runs detected in {sub_ses_anat_dir}.\nSearching for an anatomical across all sessions."
+                )
+                # Find a T2w given a subject ID
+                runs = self._find_t2w_across_sessions(sub_id, contrast_type=contrast_type)
+        else:
+            # Find a T2w given a subject ID
+            runs = self._find_t2w_across_sessions(sub_id, contrast_type=contrast_type)
+
+        n_runs = len(runs)
+        assert n_runs > 0, "Warning: No runs were detected.\nExiting."
+
+        if n_runs > 1:
+            print(f"Warning: Multiple runs were detected, using {runs[-1].stem}")
+
+        return runs[-1]
 
     def _find_t2w_across_sessions(self, sub_id: str, contrast_type: str = "T2w") -> List[Path]:
         runs = []

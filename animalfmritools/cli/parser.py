@@ -52,6 +52,12 @@ def setup_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--use_anat_to_guide",
+        action='store_true',
+        help="Use manual inputted anatomical image to guide native anat-to-template registration\nMust set --force_anat flag",
+    )
+
+    parser.add_argument(
         "--anat_contrast",
         default="T2w",
         type=str,

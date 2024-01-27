@@ -21,7 +21,7 @@ class WorkflowManager(BaseModel):
     bids_dir: Path
     deriv_dir: Path
     scratch_dir: Path
-    anat: Path
+    anat: Dict[str, Path]
     bold_runs: Dict[str, List[Path]]
     fmap_runs: Dict[str, List[Path]]
     template: Dict[str, Path]
@@ -86,6 +86,7 @@ def setup_workflow(
     deriv_dir: Path,
     scratch_dir: Path,
     force_anat: Optional[Path] = None,
+    use_anat_to_guide: bool = False,
     anat_contrast_type: str = "T2w",
 ) -> WorkflowManager:
     bids_reader = BidsReader(bids_dir)
@@ -98,7 +99,13 @@ def setup_workflow(
         "bids_dir": bids_dir,
         "deriv_dir": deriv_dir,
         "scratch_dir": scratch_dir,
-        "anat": bids_reader.get_anat(sub_id, ses_id=ses_id, force_anat=force_anat, contrast_type=anat_contrast_type),
+        "anat": bids_reader.get_anat(
+            sub_id,
+            ses_id=ses_id,
+            force_anat=force_anat,
+            use_anat_to_guide=use_anat_to_guide,
+            contrast_type=anat_contrast_type,
+        ),
         "bold_runs": bids_reader.get_bold_runs(sub_id, ses_id, ignore_tasks=[]),
         "fmap_runs": bids_reader.get_fmap_runs(sub_id, ses_id),
         "template": template,

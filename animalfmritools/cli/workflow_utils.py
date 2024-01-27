@@ -11,7 +11,7 @@ from animalfmritools.utils.data_grabber import PE_DIR_FLIP
 class BufferNodes:
     def __init__(
         self,
-        anat: pe.Node,
+        anat: Dict[str, pe.Node],
         template: pe.Node,
         surfaces: pe.Node,
         bold: Dict[str, pe.Node],
@@ -56,8 +56,10 @@ def get_run_level_buffer_nodes(
 
 def setup_buffer_nodes(wf_manager: WorkflowManager) -> BufferNodes:
     # Native anatomical buffer
-    anat_buffer = pe.Node(niu.IdentityInterface(["t2w"]), name="anat_buffer")
-    anat_buffer.inputs.t2w = wf_manager.anat
+    anat_buffer = {}
+    for anat_label, anat_path in wf_manager.anat.items():
+        anat_buffer[anat_label] = pe.Node(niu.IdentityInterface(["anat"]), name=f"{anat_label}_buffer")
+        anat_buffer[anat_label].inputs.anat = anat_path
 
     # Template anatomical buffer
     template_buffer = pe.Node(niu.IdentityInterface(["template", "gm", "wm", "csf"]), name="template_buffer")

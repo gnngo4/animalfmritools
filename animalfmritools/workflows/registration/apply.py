@@ -21,6 +21,7 @@ SCENARIO_B = [
 
 def init_merge_bold_to_template_trans(
     no_sdc: bool = False,
+    use_anat_to_guide: bool = False,
     name: str = "merge_bold_to_template_transforms_wf",
 ) -> Workflow:
     """
@@ -31,13 +32,15 @@ def init_merge_bold_to_template_trans(
     1) Dbold to Dboldtemplate
     2) Dboldtemplate sdc warp
     3) UDbold to UDboldtemplate
-    4) UDboldtemplate to anat
+    4) UDboldtemplate to anat [or anat_native]
+    5-) anat_native to anat
     5) anat to template
 
     [Scenario B] If opposite PE BOLD runs are not detected, then no SDC warp is estimated.
     Merge transforms
     1) Dbold to Dboldtemplate
-    2) Dboldtemplate to anat
+    2) Dboldtemplate to anat [or anat_native]
+    3-) anat_native to anat
     3) anat to template
     """
 
@@ -49,6 +52,9 @@ def init_merge_bold_to_template_trans(
     )
 
     INPUTNODE_FILES = ["regridded_anat", "regridded_template"]
+
+    if use_anat_to_guide:
+        INPUTNODE_FILES += ["anat_native_to_anat_secondary_warp"]
 
     # Scenario B
     if no_sdc:
@@ -81,6 +87,20 @@ def init_merge_bold_to_template_trans(
             (merge_1_3, outputnode, [("out_file", "Dbold_to_template_warp")])
         ])
         # fmt: on
+
+        if use_anat_to_guide:
+            merge_anat_warps = pe.Node(ConvertWarp(output_type="NIFTI_GZ", relwarp=True), name="merge_anat_warps")
+            # fmt: off
+            workflow.disconnect([(inputnode, merge_1_3, [("anat_to_template_warp", "warp1")])])
+            workflow.connect([
+                (inputnode, merge_anat_warps, [
+                    ("anat_native_to_anat_secondary_warp", "warp1"),
+                    ("anat_to_template_warp", "warp2"),
+                    ("regridded_template", "reference"),
+                ]),
+                (merge_anat_warps, merge_1_3, [("out_file", "warp1")]),
+            ])
+            # fmt: on
 
     # Scenario A
     else:
@@ -122,12 +142,27 @@ def init_merge_bold_to_template_trans(
         ])
         # fmt: on
 
+        if use_anat_to_guide:
+            merge_anat_warps = pe.Node(ConvertWarp(output_type="NIFTI_GZ", relwarp=True), name="merge_anat_warps")
+            # fmt: off
+            workflow.disconnect([(inputnode, merge_1_5, [("anat_to_template_warp", "warp2")])])
+            workflow.connect([
+                (inputnode, merge_anat_warps, [
+                    ("anat_native_to_anat_secondary_warp", "warp1"),
+                    ("anat_to_template_warp", "warp2"),
+                    ("regridded_template", "reference"),
+                ]),
+                (merge_anat_warps, merge_1_5, [("out_file", "warp2")]),
+            ])
+            # fmt: on
+
     return workflow
 
 
 def init_trans_bold_to_template_wf(
     no_sdc: bool = False,
     reg_quick: bool = False,
+    use_anat_to_guide: bool = False,
     name: str = "transform_bold_to_template_wf",
 ) -> Workflow:
     workflow = Workflow(name=name)
@@ -139,8 +174,11 @@ def init_trans_bold_to_template_wf(
         name="outputnode",
     )
 
-    merge_bold_to_template_trans = init_merge_bold_to_template_trans(no_sdc=no_sdc)
+    merge_bold_to_template_trans = init_merge_bold_to_template_trans(no_sdc=no_sdc, use_anat_to_guide=use_anat_to_guide)
     apply_bold_to_template = pe.Node(ApplyBoldToAnat(debug=reg_quick), name="apply_transformations")
+
+    if use_anat_to_guide:
+        INPUTNODE_FILES += ["anat_native_to_anat_secondary_warp"]
 
     if no_sdc:
         INPUTNODE_FILES += SCENARIO_B
@@ -190,5 +228,14 @@ def init_trans_bold_to_template_wf(
         (apply_bold_to_template, outputnode, [("t1_bold_path", "bold_template_space")])
     ])
     # fmt: on
+
+    if use_anat_to_guide:
+        # fmt: off
+        workflow.connect([
+            (inputnode, merge_bold_to_template_trans, [
+                ("anat_native_to_anat_secondary_warp", "inputnode.anat_native_to_anat_secondary_warp")
+            ])
+        ])
+        # fmt: on
 
     return workflow

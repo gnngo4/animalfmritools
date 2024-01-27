@@ -18,6 +18,8 @@ class DerivativeOutputs(BaseModel, extra="allow"):
     reg_from_UDbold_to_UDboldtemplate: Dict[str, Path]
     reg_from_Dboldtemplate_to_anat: Path
     reg_from_UDboldtemplate_to_anat: Path
+    reg_from_anatnative_to_anat_init: Path
+    reg_from_anatnative_to_anat: Path
     reg_from_anat_to_template_init: Path
     reg_from_anat_to_template: Path
 
@@ -56,6 +58,14 @@ def get_source_files(
         f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_from-UDboldtemplate_to-anat.svg"
     )
+    reg_from_anatnative_to_anat_init = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_from-anatnative_to-anat_init.svg"
+    )
+    reg_from_anatnative_to_anat = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_from-anatnative_to-anat.svg"
+    )
     reg_from_anat_to_template_init = Path(
         f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_from-anat_to-template_init.svg"
@@ -69,6 +79,8 @@ def get_source_files(
         reg_from_UDbold_to_UDboldtemplate=reg_from_UDbold_to_UDboldtemplate,
         reg_from_Dboldtemplate_to_anat=reg_from_Dboldtemplate_to_anat,
         reg_from_UDboldtemplate_to_anat=reg_from_UDboldtemplate_to_anat,
+        reg_from_anatnative_to_anat_init=reg_from_anatnative_to_anat_init,
+        reg_from_anatnative_to_anat=reg_from_anatnative_to_anat,
         reg_from_anat_to_template_init=reg_from_anat_to_template_init,
         reg_from_anat_to_template=reg_from_anat_to_template,
     )
@@ -88,6 +100,7 @@ def init_base_preproc_derivatives_wf(
     outputs: DerivativeOutputs,
     name: str,
     no_sdc: bool = False,
+    use_anat_to_guide: bool = False,
 ) -> Workflow:
     workflow = Workflow(name=name)
 
@@ -104,6 +117,11 @@ def init_base_preproc_derivatives_wf(
                 continue
         else:
             if f == "reg_from_Dboldtemplate_to_anat":
+                continue
+
+        # Add `use_anat_to_guide` heuristic
+        if not use_anat_to_guide:
+            if "anatnative" in f:
                 continue
 
         out_file = getattr(outputs, f)
