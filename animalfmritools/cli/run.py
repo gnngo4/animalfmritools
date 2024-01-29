@@ -260,6 +260,7 @@ def run():
         wf_manager.deriv_dir,
         first_dir_type,
         all_dir_types,
+        args.anat_contrast,
     )
     base_deriv_wf = init_base_preproc_derivatives_wf(
         deriv_outputs, name="base_derivatives", no_sdc=no_sdc, use_anat_to_guide=use_anat_to_guide
@@ -390,6 +391,19 @@ def run():
             ("outputnode.init_out_report", "inputnode.reg_from_anat_to_template_init"),
             ("outputnode.out_report", "inputnode.reg_from_anat_to_template"),
         ]),
+    ])
+    # fmt: on
+
+    # Reverse scaling of anatomical brainmask
+    reverse_rescaling_anat = pe.Node(
+        RescaleNifti(rescale_factor=1 / RESCALE_FACTOR),
+        name="anat_brainmask_reverse_rescale",
+    )
+
+    # fmt: off
+    wf.connect([
+        (reg_anat_to_template, reverse_rescaling_anat, [("outputnode.anat_brain", "nifti_path")]),
+        (reverse_rescaling_anat, base_deriv_wf, [("rescaled_path", "inputnode.anat_brainmask")]),
     ])
     # fmt: on
 

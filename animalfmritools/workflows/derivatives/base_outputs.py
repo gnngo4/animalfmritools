@@ -22,6 +22,7 @@ class DerivativeOutputs(BaseModel, extra="allow"):
     reg_from_anatnative_to_anat: Path
     reg_from_anat_to_template_init: Path
     reg_from_anat_to_template: Path
+    anat_brainmask: Path
 
     def expand_reg_from_UDbold_to_UDboldtemplate(self):
         for from_dir, svg_out in self.reg_from_UDbold_to_UDboldtemplate.items():
@@ -40,6 +41,7 @@ def get_source_files(
     derivatives_dir: Path,
     to_dir: str,
     from_dirs: List[str],
+    anat_contrast: str,
 ) -> DerivativeOutputs:
     reg_from_UDbold_to_UDboldtemplate = {}
     for from_dir in from_dirs:
@@ -74,6 +76,10 @@ def get_source_files(
         f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_from-anat_to-template.svg"
     )
+    anat_brainmask = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/anat/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_desc-brainmask_{anat_contrast}.nii.gz"
+    )
 
     outputs = DerivativeOutputs(
         reg_from_UDbold_to_UDboldtemplate=reg_from_UDbold_to_UDboldtemplate,
@@ -83,6 +89,7 @@ def get_source_files(
         reg_from_anatnative_to_anat=reg_from_anatnative_to_anat,
         reg_from_anat_to_template_init=reg_from_anat_to_template_init,
         reg_from_anat_to_template=reg_from_anat_to_template,
+        anat_brainmask=anat_brainmask,
     )
     outputs.expand_reg_from_UDbold_to_UDboldtemplate()
 
