@@ -171,6 +171,16 @@ class BidsReader(BidsReaderInput):
         assert n_runs > 0, "Warning: No runs were detected.\nExiting."
 
         if n_runs > 1:
+            brainmask_runs = [_run for _run in runs if "desc-brainmask" in str(_run)]
+            if len(brainmask_runs) > 1:
+                print(f"Warning: Multiple brainmasks were detected, using {brainmask_runs[-1].stem}")
+                return brainmask_runs[-1]
+            elif len(brainmask_runs) == 1:
+                print(f"Warning: Using a brainmask : {brainmask_runs[0].stem}")
+                return brainmask_runs[-1]
+            else:
+                pass
+
             print(f"Warning: Multiple runs were detected, using {runs[-1].stem}")
 
         return runs[-1]
