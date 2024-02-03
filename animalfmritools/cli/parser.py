@@ -1,6 +1,13 @@
 import argparse
 
 
+def bold_to_anat_dof(arg: str) -> int:
+    arg_int = int(arg)
+    if arg_int not in {6, 7, 9, 12}:
+        raise argparse.ArgumentTypeError("Invalid option. Choose: [6, 7, 9, 12]")
+    return arg_int
+
+
 def setup_parser() -> argparse.ArgumentParser:
     """
     Set-up Python's ArgumentParser for animalfmritools
@@ -69,6 +76,20 @@ def setup_parser() -> argparse.ArgumentParser:
         default="/tmp",
         type=str,
         help="workflow output directory.",
+    )
+
+    parser.add_argument(
+        "--bold_to_anat_affine",
+        default=None,
+        type=str,
+        help="Manual input of bold-to-anatomical affine",
+    )
+
+    parser.add_argument(
+        "--bold_to_anat_dof",
+        default=6,
+        type=bold_to_anat_dof,
+        help="Specify degrees-of-freedom for bold-to-anatomical registration (6, 7, 9, 12)\nDefault=6",
     )
 
     parser.add_argument(

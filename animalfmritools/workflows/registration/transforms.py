@@ -1,4 +1,5 @@
-from typing import List
+from pathlib import Path
+from typing import List, Optional
 
 from nipype.interfaces import utility as niu
 from nipype.interfaces.ants import N4BiasFieldCorrection, RegistrationSynQuick
@@ -90,7 +91,9 @@ def init_reg_Dbold_to_Dboldtemplate_wf(
     return workflow
 
 
-def init_reg_Dboldtemplate_to_anat_wf(name: str = "reg_Dboldtemplate_to_anat_wf") -> Workflow:
+def init_reg_Dboldtemplate_to_anat_wf(
+    dof: int = 6, in_affine: Optional[Path] = None, name: str = "reg_Dboldtemplate_to_anat_wf"
+) -> Workflow:
     """
     Dboldtemplate: (NOT) distortion corrected, mask, and temporally meaned
     anat: n4 bias field corrected, masked, regridded to bold FOV
@@ -124,11 +127,15 @@ def init_reg_Dboldtemplate_to_anat_wf(name: str = "reg_Dboldtemplate_to_anat_wf"
     Dboldtemplate_4_applymask = pe.Node(ApplyMask(), name="Dboldtemplate_4_apply_mask")
     # Register UDboldtemplate to anat
     reg_Dboldtemplate_to_anat = pe.Node(
-        FLIRTRPT(dof=7, generate_report=True),
+        FLIRTRPT(dof=dof, generate_report=True),
         name="Dboldtemplate_to_anat",
     )
+    if in_affine:
+        reg_Dboldtemplate_to_anat.inputs.apply_xfm = True
+        reg_Dboldtemplate_to_anat.inputs.in_matrix_file = in_affine
+
     outputnode = pe.Node(
-        niu.IdentityInterface(fields=["out_report", "fsl_affine"]),
+        niu.IdentityInterface(fields=["out_report", "fsl_affine", "boldref", "masked_boldref", "masked_anat"]),
         name="outputnode",
     )
 
@@ -150,6 +157,9 @@ def init_reg_Dboldtemplate_to_anat_wf(name: str = "reg_Dboldtemplate_to_anat_wf"
             ("out_matrix_file", "fsl_affine"),
             ("out_report", "out_report"),
         ]),
+        (Dboldtemplate_1_n4, outputnode, [("output_image", "boldref")]),
+        (Dboldtemplate_4_applymask, outputnode, [("out_file", "masked_boldref")]),
+        (inputnode, outputnode, [("masked_anat", "masked_anat")]),
     ])
     # fmt: on
 
@@ -205,7 +215,9 @@ def init_reg_UDbold_to_UDboldtemplate_wf(
     return workflow
 
 
-def init_reg_UDboldtemplate_to_anat_wf(name: str = "reg_UDboldtemplate_to_anat_wf") -> Workflow:
+def init_reg_UDboldtemplate_to_anat_wf(
+    dof: int = 6, in_affine: Optional[Path] = None, name: str = "reg_UDboldtemplate_to_anat_wf"
+) -> Workflow:
     """
     UDboldtemplate: distortion corrected, mask, and temporally meaned
     anat: n4 bias field corrected, masked, regridded to bold FOV
@@ -241,11 +253,15 @@ def init_reg_UDboldtemplate_to_anat_wf(name: str = "reg_UDboldtemplate_to_anat_w
     UDboldtemplate_4_applymask = pe.Node(ApplyMask(), name="UDboldtemplate_4_apply_mask")
     # Register UDboldtemplate to anat
     reg_UDboldtemplate_to_anat = pe.Node(
-        FLIRTRPT(dof=7, generate_report=True),
+        FLIRTRPT(dof=dof, generate_report=True),
         name="UDboldtemplate_to_anat",
     )
+    if in_affine:
+        reg_UDboldtemplate_to_anat.inputs.apply_xfm = True
+        reg_UDboldtemplate_to_anat.inputs.in_matrix_file = in_affine
+
     outputnode = pe.Node(
-        niu.IdentityInterface(fields=["out_report", "fsl_affine"]),
+        niu.IdentityInterface(fields=["out_report", "fsl_affine", "boldref", "masked_boldref", "masked_anat"]),
         name="outputnode",
     )
 
@@ -272,6 +288,9 @@ def init_reg_UDboldtemplate_to_anat_wf(name: str = "reg_UDboldtemplate_to_anat_w
             ("out_matrix_file", "fsl_affine"),
             ("out_report", "out_report"),
         ]),
+        (UDboldtemplate_1_n4, outputnode, [("output_image", "boldref")]),
+        (UDboldtemplate_4_applymask, outputnode, [("out_file", "masked_boldref")]),
+        (inputnode, outputnode, [("masked_anat", "masked_anat")]),
     ])
     # fmt: on
 

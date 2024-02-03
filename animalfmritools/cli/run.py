@@ -65,11 +65,18 @@ def run():
     parser = setup_parser()
     args = parser.parse_args()
 
+    # Set force anat
     force_anat = Path(args.force_anat) if isinstance(args.force_anat, str) else args.force_anat
-
     use_anat_to_guide = args.use_anat_to_guide
     if args.use_anat_to_guide and not args.force_anat:
         raise ValueError("--force_anat <anat_path> must be set.")
+
+    # Set bold-to-anat affine
+    bold_to_anat_affine = (
+        Path(args.bold_to_anat_affine) if isinstance(args.bold_to_anat_affine, str) else args.bold_to_anat_affine
+    )
+    if args.bold_to_anat_affine:
+        assert bold_to_anat_affine.exists(), f"{bold_to_anat_affine} not found."
 
     # Subject info
     wf_manager = setup_workflow(
@@ -364,22 +371,38 @@ def run():
     reg_Dboldtemplate_to_anat = None
     reg_UDboldtemplate_to_anat = None
     if no_sdc:
-        reg_Dboldtemplate_to_anat = init_reg_Dboldtemplate_to_anat_wf(name="reg_Dboldtemplate_to_anat")
+        reg_Dboldtemplate_to_anat = init_reg_Dboldtemplate_to_anat_wf(
+            dof=args.bold_to_anat_dof,
+            in_affine=bold_to_anat_affine,
+            name="reg_Dboldtemplate_to_anat",
+        )
         # fmt: off
         wf.connect([
             (buffer_nodes.bold[first_dir_type], reg_Dboldtemplate_to_anat, [(session_bold_run_input, "inputnode.Dboldtemplate_run")]),
             (reg_anat_to_template, reg_Dboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")]),
-            (reg_Dboldtemplate_to_anat, base_deriv_wf, [("outputnode.out_report", "inputnode.reg_from_Dboldtemplate_to_anat")]),
+            (reg_Dboldtemplate_to_anat, base_deriv_wf, [
+                ("outputnode.out_report", "inputnode.reg_from_Dboldtemplate_to_anat"),
+                ("outputnode.boldref", "inputnode.boldref_from_Dboldtemplate_to_anat"),
+                ("outputnode.masked_boldref", "inputnode.boldref_brainmask_from_Dboldtemplate_to_anat"),
+                ("outputnode.masked_anat", "inputnode.anat_brainmask_from_Dboldtemplate_to_anat"),
+            ]),
         ])
         # fmt: on
     else:
-        reg_UDboldtemplate_to_anat = init_reg_UDboldtemplate_to_anat_wf(name="reg_UDboldtemplate_to_anat_wf")
+        reg_UDboldtemplate_to_anat = init_reg_UDboldtemplate_to_anat_wf(
+            dof=args.bold_to_anat_dof, in_affine=bold_to_anat_affine, name="reg_UDboldtemplate_to_anat_wf"
+        )
         # fmt: off
         wf.connect([
             (buffer_nodes.bold[first_dir_type], reg_UDboldtemplate_to_anat, [(session_bold_run_input, "inputnode.Dboldtemplate_run")]),
             (buffer_nodes.bold_session[first_dir_type], reg_UDboldtemplate_to_anat, [("sdc_warp", "inputnode.Dboldtemplate_sdc_warp")]),
             (reg_anat_to_template, reg_UDboldtemplate_to_anat, [("outputnode.anat_brain", "inputnode.masked_anat")]),
-            (reg_UDboldtemplate_to_anat, base_deriv_wf, [("outputnode.out_report", "inputnode.reg_from_UDboldtemplate_to_anat")]),
+            (reg_UDboldtemplate_to_anat, base_deriv_wf, [
+                ("outputnode.out_report", "inputnode.reg_from_UDboldtemplate_to_anat"),
+                ("outputnode.boldref", "inputnode.boldref_from_UDboldtemplate_to_anat"),
+                ("outputnode.masked_boldref", "inputnode.boldref_brainmask_from_UDboldtemplate_to_anat"),
+                ("outputnode.masked_anat", "inputnode.anat_brainmask_from_UDboldtemplate_to_anat"),
+            ]),
         ])
         # fmt: on
 

@@ -17,7 +17,13 @@ class DerivativeOutputs(BaseModel, extra="allow"):
     # reg_Dboldtemplate_sdc_warp: Path
     reg_from_UDbold_to_UDboldtemplate: Dict[str, Path]
     reg_from_Dboldtemplate_to_anat: Path
+    boldref_from_Dboldtemplate_to_anat: Path
+    boldref_brainmask_from_Dboldtemplate_to_anat: Path
+    anat_brainmask_from_Dboldtemplate_to_anat: Path
     reg_from_UDboldtemplate_to_anat: Path
+    boldref_from_UDboldtemplate_to_anat: Path
+    boldref_brainmask_from_UDboldtemplate_to_anat: Path
+    anat_brainmask_from_UDboldtemplate_to_anat: Path
     reg_from_anatnative_to_anat_init: Path
     reg_from_anatnative_to_anat: Path
     reg_from_anat_to_template_init: Path
@@ -56,9 +62,33 @@ def get_source_files(
         f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_from-Dboldtemplate_to-anat.svg"
     )
+    boldref_from_Dboldtemplate_to_anat = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/reg_debug/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_Dboldtemplate.nii.gz"
+    )
+    boldref_brainmask_from_Dboldtemplate_to_anat = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/reg_debug/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_desc-brainmask_Dboldtemplate.nii.gz"
+    )
+    anat_brainmask_from_Dboldtemplate_to_anat = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/reg_debug/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_desc-brainmask_{anat_contrast}.nii.gz"
+    )
     reg_from_UDboldtemplate_to_anat = Path(
         f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_from-UDboldtemplate_to-anat.svg"
+    )
+    boldref_from_UDboldtemplate_to_anat = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/reg_debug/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_UDboldtemplate.nii.gz"
+    )
+    boldref_brainmask_from_UDboldtemplate_to_anat = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/reg_debug/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_desc-brainmask_UDboldtemplate.nii.gz"
+    )
+    anat_brainmask_from_UDboldtemplate_to_anat = Path(
+        f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/reg_debug/"
+        f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_desc-brainmask_{anat_contrast}.nii.gz"
     )
     reg_from_anatnative_to_anat_init = Path(
         f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/figures/"
@@ -84,7 +114,13 @@ def get_source_files(
     outputs = DerivativeOutputs(
         reg_from_UDbold_to_UDboldtemplate=reg_from_UDbold_to_UDboldtemplate,
         reg_from_Dboldtemplate_to_anat=reg_from_Dboldtemplate_to_anat,
+        boldref_from_Dboldtemplate_to_anat=boldref_from_Dboldtemplate_to_anat,
+        boldref_brainmask_from_Dboldtemplate_to_anat=boldref_brainmask_from_Dboldtemplate_to_anat,
+        anat_brainmask_from_Dboldtemplate_to_anat=anat_brainmask_from_Dboldtemplate_to_anat,
         reg_from_UDboldtemplate_to_anat=reg_from_UDboldtemplate_to_anat,
+        boldref_from_UDboldtemplate_to_anat=boldref_from_UDboldtemplate_to_anat,
+        boldref_brainmask_from_UDboldtemplate_to_anat=boldref_brainmask_from_UDboldtemplate_to_anat,
+        anat_brainmask_from_UDboldtemplate_to_anat=anat_brainmask_from_UDboldtemplate_to_anat,
         reg_from_anatnative_to_anat_init=reg_from_anatnative_to_anat_init,
         reg_from_anatnative_to_anat=reg_from_anatnative_to_anat,
         reg_from_anat_to_template_init=reg_from_anat_to_template_init,
@@ -123,7 +159,12 @@ def init_base_preproc_derivatives_wf(
             if "UDbold" in f:
                 continue
         else:
-            if f == "reg_from_Dboldtemplate_to_anat":
+            if f in [
+                "reg_from_Dboldtemplate_to_anat",
+                "boldref_from_Dboldtemplate_to_anat",
+                "boldref_brainmask_from_Dboldtemplate_to_anat",
+                "anat_brainmask_from_Dboldtemplate_to_anat",
+            ]:
                 continue
 
         # Add `use_anat_to_guide` heuristic
