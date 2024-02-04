@@ -45,10 +45,28 @@ def init_reg_Dbold_to_Dboldtemplate_wf(
     n4_reg_flag: bool = False,
     name: str = "reg_Dbold_to_Dboldtemplate_wf",
 ) -> Workflow:
-    """
-    Dbold: distorted bold (or uncorrected with FSL's TOPUP)
-    Dboldtemplate: distorted bold (heuristically select the 1st run as the template)
-    NOTE: In this pipeline, FSL's TOPUP is applied to Dboldtemplate
+    """Build a workflow to run same-subject, distorted-BOLD to distorted-BOLD-template registration.
+
+    Distorted-BOLD is the bold reference derived from a specific BOLD run.
+    Distorted-BOLD-template denotes the chosen bold reference template, against which all same-subject BOLD runs are registered.
+
+    Args:
+        n4_reg_flag (bool): True will enable N4 bias field correction on all nodes. (default: False)
+        name (str): Name of workflow. (default: "reg_Dbold_to_Dboldtemplate_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        Dbold: Distorted BOLD reference
+        Dboldtemplate: Distorted BOLD template
+
+    Workflow Outputs:
+        out_report: Registration quality assurance (.svg)
+        fsl_affine: Affine transform from Dbold to Dboldtemplate (FSL format)
+
+    See also:
+        - :func: `~animalfmritools.workflows.registration.transforms.connect_n4_nodes`
     """
 
     workflow = Workflow(name=name)
@@ -169,10 +187,30 @@ def init_reg_Dboldtemplate_to_anat_wf(
 def init_reg_UDbold_to_UDboldtemplate_wf(
     n4_reg_flag: bool = False, name: str = "reg_UDbold_to_UDboldtemplate_wf"
 ) -> Workflow:
-    """
-    UDbold: undistorted bold (or corrected with FSL's TOPUP)
-    UDboldtemplate: undistorted bold (heuristically select the 1st detected PE dir run as the template)
-    NOTE: In this pipeline, UDboldtemplate is used for spatial normalization to the animal's anatomical scan (anat)
+    """Build a workflow to run same-subject, undistorted-BOLD to undistorted-BOLD-template registration.
+
+    In this pipeline, distortion correction is executed upon detection of BOLD runs with opposite phase-encoding directions. One phase-encoding run is designated for registration to the anatomical space. As such, the other phase-encoding run must be registered to this selected run.
+
+    Undistorted-BOLD is the bold template derived for each phase-encoding direction.
+    Undistorted-BOLD-template denotes the chosen bold reference template to which all undistorted BOLD template runs from the same subject (across different phase-encoding directions) are registered.
+
+    Args:
+        n4_reg_flag (bool): True will enable N4 bias field correction on all nodes. (default: False)
+        name (str): Name of workflow. (default: "reg_Dbold_to_Dboldtemplate_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        UDbold: Undistorted BOLD reference
+        UDboldtemplate: Undistorted BOLD template
+
+    Workflow Outputs:
+        out_report: Registration quality assurance (.svg)
+        fsl_affine: Affine transform from UDbold to UDboldtemplate (FSL format)
+
+    See also:
+        - :func: `~animalfmritools.workflows.registration.transforms.connect_n4_nodes`
     """
 
     workflow = Workflow(name=name)
