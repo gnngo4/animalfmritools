@@ -9,6 +9,8 @@ REVERSE_PE_MAPPING = {
     "dir-PA": "dir-AP",
     "dir-LR": "dir-RL",
     "dir-RL": "dir-LR",
+    "dir-IS": "dir-SI",
+    "dir-SI": "dir-IS",
 }
 
 PE_DIR_FLIP: Dict[str, bool] = {
@@ -16,6 +18,8 @@ PE_DIR_FLIP: Dict[str, bool] = {
     "dir-PA": True,
     "dir-LR": False,
     "dir-RL": True,
+    "dir-IS": False,
+    "dir-SI": True,
 }
 
 PE_DIR_SCHEMA: Dict[str, List[str]] = {
@@ -23,6 +27,8 @@ PE_DIR_SCHEMA: Dict[str, List[str]] = {
     "dir-PA": [],
     "dir-LR": [],
     "dir-RL": [],
+    "dir-IS": [],
+    "dir-SI": [],
 }
 
 

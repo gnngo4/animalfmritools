@@ -316,6 +316,10 @@ def _TOPUPAcqParams(nifti_list, out_path=OUTPATHS["TOPUPAcqParams"]):
                 pedir_encoding = ["1", "0", "0", f"{total_readout_time:.5f}"]
             elif pedir == "LR":
                 pedir_encoding = ["-1", "0", "0", f"{total_readout_time:.5f}"]
+            elif pedir == "SI":
+                pedir_encoding = ["0", "0", "1", f"{total_readout_time:.5f}"]
+            elif pedir == "IS":
+                pedir_encoding = ["0", "0", "-1", f"{total_readout_time:.5f}"]
             else:
                 raise NotImplementedError("This functionality is not implemented yet.")
             f.write(" ".join(pedir_encoding) + "\n")
