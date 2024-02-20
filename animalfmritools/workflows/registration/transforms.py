@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from nipype.interfaces import utility as niu
-from nipype.interfaces.ants import N4BiasFieldCorrection, RegistrationSynQuick
+from nipype.interfaces.ants import N4BiasFieldCorrection
 from nipype.interfaces.fsl import FLIRT, MCFLIRT, ApplyWarp, ConvertWarp, ConvertXFM
 from nipype.interfaces.fsl.maths import ApplyMask, MeanImage, Threshold
 from nipype.interfaces.fsl.utils import Split
@@ -11,6 +11,7 @@ from nipype.pipeline import engine as pe
 from niworkflows.engine.workflows import LiterateWorkflow as Workflow
 from niworkflows.interfaces.reportlets.registration import FLIRTRPT, ANTSApplyTransformsRPT
 
+from animalfmritools.interfaces.ants_reg import RegistrationSyN
 from animalfmritools.workflows.registration.utils import init_itk_to_fsl_affine_wf, init_itk_to_fsl_warp_wf
 
 
@@ -21,6 +22,18 @@ def connect_n4_nodes(
     fields: List[str],
     n4_reg_flag: bool = False,
 ) -> Workflow:
+    """Extends a workflow by connecting a N4BiasFieldCorrection node to a list of fields.
+
+    Args:
+        inputnode (pe.Node): The input node within a `workflow` that includes `fields` to be connected for N4BiasFieldCorrection.
+        buffer (pe.Node): The output node within a `workflow` that contains the outputs from the N4BiasFieldCorrection.
+        workflow (Workflow): The input workflow that contains the `inputnode`.
+        fields (list[str]): A list of fields found in `inputnode`.
+        n4_reg_flag (bool): True will enable N4 bias field correction on all nodes. (default: False)
+
+    Returns:
+        Workflow: The constructed workflow (with N4 bias field correction nodes).
+    """
     if n4_reg_flag:
         for field in fields:
             n4biasfieldcorrection = pe.Node(N4BiasFieldCorrection(), name=f"n4biasfieldcorrection_{field}")
@@ -112,11 +125,30 @@ def init_reg_Dbold_to_Dboldtemplate_wf(
 def init_reg_Dboldtemplate_to_anat_wf(
     dof: int = 6, in_affine: Optional[Path] = None, name: str = "reg_Dboldtemplate_to_anat_wf"
 ) -> Workflow:
-    """
-    Dboldtemplate: (NOT) distortion corrected, mask, and temporally meaned
-    anat: n4 bias field corrected, masked, regridded to bold FOV
-    """
+    """Build a workflow to run same-subject, distorted-BOLD-template to anatomical registration.
 
+    Distorted-BOLD-template denotes the chosen bold reference template, against which all same-subject BOLD runs are registered.
+    Anatomical denotes a skullstripped structural image.
+
+    Args:
+        dof (int): Degrees of freedom (default: 6).
+        in_affine (Optional[Path]): A custom affine transformation. (default: None)
+        name (str): Name of workflow. (default: "reg_Dbold_to_Dboldtemplate_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        Dboldtemplate_run: Distorted BOLD reference
+        masked_anat: Masked anatomical
+
+    Workflow Outputs:
+        out_report: Registration quality assurance (.svg)
+        fsl_affine: Affine transform from Dboldtemplate to anatomical (FSL format)
+        boldref: Distorted BOLD reference (Troubleshooting: used for manual estimation of `in_affine`)
+        masked_boldref: Masked distorted BOLD reference (Troubleshooting: used for manual estimation of `in_affine`)
+        masked_anat: Masked anatomical (Troubleshooting: used for manual estimation of `in_affine`)
+    """
     workflow = Workflow(name=name)
 
     INPUTNODE_FIELDS = [
@@ -129,10 +161,6 @@ def init_reg_Dboldtemplate_to_anat_wf(
         name="inputnode",
     )
 
-    """
-    Distortion correct and obtain a mean image of the heuristically selected
-    inputnode: `Dboldtemplate_run`
-    """
     Dboldtemplate_1_split = pe.Node(Split(dimension="t", out_base_name="split_bold_"), name="Dboldtemplate_1_split")
     Dboldtemplate_2_hmc = pe.Node(
         MCFLIRT(save_mats=False, save_plots=False, save_rms=False), name="Dboldtemplate_2_hmc"
@@ -256,11 +284,34 @@ def init_reg_UDbold_to_UDboldtemplate_wf(
 def init_reg_UDboldtemplate_to_anat_wf(
     dof: int = 6, in_affine: Optional[Path] = None, name: str = "reg_UDboldtemplate_to_anat_wf"
 ) -> Workflow:
-    """
-    UDboldtemplate: distortion corrected, mask, and temporally meaned
-    anat: n4 bias field corrected, masked, regridded to bold FOV
-    """
+    """Build a workflow to run same-subject, undistorted-BOLD-template to anatomical registration.
 
+    This process uses a distorted-BOLD-template and a susceptibility distortion correction warp to generate an undistorted-BOLD-template.
+
+    Distorted-BOLD-template denotes the chosen bold reference template, against which all same-subject BOLD runs are registered.
+    Susceptibility distortion correction warp is generated with TOPUP estimated with opposite phase-encoding BOLD/fmap runs.
+    Anatomical denotes a skullstripped structural image.
+
+    Args:
+        dof (int): Degrees of freedom (default: 6).
+        in_affine (Path, optional): A custom affine transformation. (default: None)
+        name (str): Name of workflow. (default: "reg_UDboldtemplate_to_anat_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        Dboldtemplate_run: Distorted BOLD reference
+        Dboldtemplate_sdc_warp: FSL's TOPUP estimated susceptibility distortion correction warp
+        masked_anat: Masked anatomical
+
+    Workflow Outputs:
+        out_report: Registration quality assurance (.svg)
+        fsl_affine: Affine transform from Dboldtemplate to anatomical (FSL format)
+        boldref: Undistorted BOLD reference (Troubleshooting: used for manual estimation of `in_affine`)
+        masked_boldref: Masked Undistorted BOLD reference (Troubleshooting: used for manual estimation of `in_affine`)
+        masked_anat: Masked anatomical (Troubleshooting: used for manual estimation of `in_affine`)
+    """
     workflow = Workflow(name=name)
 
     INPUTNODE_FIELDS = [
@@ -274,10 +325,6 @@ def init_reg_UDboldtemplate_to_anat_wf(
         name="inputnode",
     )
 
-    """
-    Distortion correct and obtain a mean image of the heuristically selected
-    inputnode: `Dboldtemplate_run`
-    """
     Dboldtemplate_1_split = pe.Node(Split(dimension="t", out_base_name="split_bold_"), name="Dboldtemplate_1_split")
     Dboldtemplate_2_hmc = pe.Node(
         MCFLIRT(save_mats=False, save_plots=False, save_rms=False), name="Dboldtemplate_2_hmc"
@@ -338,6 +385,28 @@ def init_reg_UDboldtemplate_to_anat_wf(
 def init_reg_anat_to_template_wf(
     template_thr: float, skullstrip_anat: bool = True, name: str = "reg_anat_to_template_wf"
 ) -> Workflow:
+    """Build a workflow to run same-subject, anatomical to template registration.
+
+    In the pipeline, this workflow is used to perform anatomical-to-template and anatomical(native)-to-anatomical(template) registrations.
+
+    Args:
+        template_thr (float): Thresholding parameter for generating a skullstripped anatomical mask using a template-in-anatomical-space.
+        skullstrip_anat (bool): True will enable skullstripping of anatomical. (default: True)
+        name (str): Name of workflow. (default: "reg_anat_to_template_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        anat: Anatomical
+        template: Template
+
+    Workflow Outputs:
+        init_out_report: Initial registration quality assurance (.svg)
+        out_report: Registration quality assurance (.svg)
+        fsl_warp: Warp from anatomical to template (FSL format)
+        anat_brain: Skullstripped anatomical, outputted when `skullstrip_anat==True`
+    """
     workflow = Workflow(name=name)
 
     OUTPUTNODE_FIELDS = ["init_out_report", "out_report", "fsl_warp"]
@@ -363,7 +432,8 @@ def init_reg_anat_to_template_wf(
         ),
         name="anat_to_template_init",
     )
-    reg_anat_to_template = pe.Node(RegistrationSynQuick(transform_type="b"), name="anat_to_template")
+
+    reg_anat_to_template = pe.Node(RegistrationSyN(transform_type="b"), name="anat_to_template")
     report_anat_to_template = pe.Node(
         ANTSApplyTransformsRPT(generate_report=True), name="generate_report_anat_to_template"
     )
@@ -445,8 +515,28 @@ def init_reg_anat_to_template_wf(
 
 
 def _get_split_volume(out_files, vol_id):
+    """
+    Retrieves a split volume from a list of output files.
+
+    Args:
+        out_files (List[Any]): A list of output files.
+        vol_id (int): The index of the volume to retrieve.
+
+    Returns:
+        Any: The split volume specified by `vol_id`.
+    """
     return out_files[vol_id]
 
 
 def _listify_two_inputs(input_1, input_2):
+    """
+    Combines two inputs into a list.
+
+    Args:
+        input_1 (Any): The first input.
+        input_2 (Any): The second input.
+
+    Returns:
+        List[Any]: A list containing both input_1 and input_2.
+    """
     return [input_1, input_2]
