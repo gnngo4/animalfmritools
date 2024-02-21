@@ -9,12 +9,37 @@ from pydantic import BaseModel
 
 
 class BaseInfo(BaseModel):
+    """Base class for storing of the processed dataset.
+
+    Attributes:
+        sub_id (str): Subject ID.
+        ses_id (str): Session ID.
+    """
+
     sub_id: str
     ses_id: str
 
 
 class DerivativeOutputs(BaseModel, extra="allow"):
-    # reg_Dboldtemplate_sdc_warp: Path
+    """Model for storing derivative outputs
+
+    Attributes:
+        reg_from_UDbold_to_UDboldtemplate (Dict[str, Path]): Mapping of paths representing the registration from UDbold to UDboldtemplate.
+        reg_from_Dboldtemplate_to_anat (Path): Registration from Dboldtemplate to anatomical.
+        boldref_from_Dboldtemplate_to_anat (Path): BOLD reference of Dboldtemplate in anatomical space.
+        boldref_brainmask_from_Dboldtemplate_to_anat (Path): Brainmask of the BOLD reference in anatomical space.
+        anat_brainmask_from_Dboldtemplate_to_anat (Path): Brainmask of anatomical in anatomical space.
+        reg_from_UDboldtemplate_to_anat (Path): Registration from UDboldtemplate to anatomical.
+        boldref_from_UDboldtemplate_to_anat (Path): BOLD reference of UDboldtemplate in anatomical space.
+        boldref_brainmask_from_UDboldtemplate_to_anat (Path): Brainmask of the BOLD reference in anatomical space.
+        anat_brainmask_from_UDboldtemplate_to_anat (Path): Brainmask of anatomical in anatomical space.
+        reg_from_anatnative_to_anat_init (Path): Initial registration from native anatomical space to the anatomical.
+        reg_from_anatnative_to_anat (Path): Registration from native anatomical space to the anatomical.
+        reg_from_anat_to_template_init (Path): Initial registration from anatomical to the template.
+        reg_from_anat_to_template (Path): Initial registration from anatomical to the template.
+        anat_brainmask (Path): Anatomical brainmask.
+    """
+
     reg_from_UDbold_to_UDboldtemplate: Dict[str, Path]
     reg_from_Dboldtemplate_to_anat: Path
     boldref_from_Dboldtemplate_to_anat: Path
@@ -31,6 +56,11 @@ class DerivativeOutputs(BaseModel, extra="allow"):
     anat_brainmask: Path
 
     def expand_reg_from_UDbold_to_UDboldtemplate(self):
+        """Expand 'reg_from_UDbold_to_UDboldtemplate' attribute.
+
+        This method iterates over the items in 'reg_from_UDbold_to_UDboldtemplate' dictionary,
+        sets new attributes with expanded names, and then deletes the original attribute.
+        """
         for from_dir, svg_out in self.reg_from_UDbold_to_UDboldtemplate.items():
             setattr(self, f"reg_from_UDbold{from_dir}_to_UDboldtemplate", svg_out)
 
@@ -38,6 +68,15 @@ class DerivativeOutputs(BaseModel, extra="allow"):
 
 
 def load_base(sub_id: str, ses_id: str) -> BaseInfo:
+    """Load base information and return as a BaseInfo object
+
+    Args:
+        sub_id (str): Subject ID.
+        ses_id (str): Session ID.
+
+    Returns:
+        BaseInfo: An instance of BaseInfo containing the provided subject and session IDS.
+    """
     info = BaseInfo(sub_id=sub_id, ses_id=ses_id)
     return info
 
@@ -49,6 +88,19 @@ def get_source_files(
     from_dirs: List[str],
     anat_contrast: str,
 ) -> DerivativeOutputs:
+    """Retrieve source files and return as DerivativeOutputs object.
+
+    Args:
+        base_info (BaseInfo): Base information with subject and session IDs.
+        derivatives_dir (Path): Path to the derivatives directory.
+        to_dir (str): The primary phase-encoding direction to be registered to the anatomical image.
+        from_dirs (List[str]): List of all detected phase-encoding directions.
+        anat_contrast (str): Contrast of the anatomical image.
+
+    Returns:
+        DerivativeOutputs: An instance of DerivativeOutputs containing the retrieved source files.
+    """
+
     reg_from_UDbold_to_UDboldtemplate = {}
     for from_dir in from_dirs:
         if from_dir == to_dir:
@@ -133,6 +185,14 @@ def get_source_files(
 
 
 def create_base_directories(outputs: DerivativeOutputs) -> None:
+    """Create base directories for the paths in the DerivativeOutputs object.
+
+    Args:
+        outputs (DerivativeOutputs): An instance of DerivativeOutputs containing paths.
+
+    Returns:
+        None
+    """
     for _k, v in outputs.dict().items():
         p = v.parent
         if not p.exists():
@@ -145,6 +205,21 @@ def init_base_preproc_derivatives_wf(
     no_sdc: bool = False,
     use_anat_to_guide: bool = False,
 ) -> Workflow:
+    """Construct a workflow to manage all pipeline outputs.
+
+    Args:
+        outputs (DerivativeOutputs): An instance of DerivativeOutputs containing paths.
+        name (str): Name of the workflow.
+        no_sdc (bool): If True, indicates no SDC is performed, and certain outputs are removed accordingly. (default: False)
+        use_anat_to_guide (bool): If True, indicates an additional native anatomical is added to the workflow, and certain outputs are removed accordingly. (default: False)
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        Refer to DerivativeOutputs BaseModel for information on workflow inputs.
+    """
+
     workflow = Workflow(name=name)
 
     # Create all expected parent directories found in `outputs

@@ -22,6 +22,20 @@ class BufferNodes:
         bold_session_template: pe.Node,
         bold_session_template_reg: pe.Node,
     ) -> None:
+        """Store buffer nodes for various data types in the workflow.
+
+        Args:
+            anat (Dict[str, pe.Node]): Buffer nodes for anatomical data.
+            template (pe.Node): Buffer node for the template.
+            surfaces (pe.Node): Buffer node for surface data.
+            bold (Dict[str, pe.Node]): Buffer nodes for BOLD data.
+            bold_inputs (Dict[str, List[str]]): Input fields for BOLD buffer nodes.
+            fmap (Dict[str, pe.Node]): Buffer nodes for field map data.
+            fmap_inputs (Dict[str, List[str]]): Input fields for field map buffer nodes.
+            bold_session (Dict[str, pe.Node]): Buffer nodes for BOLD session data.
+            bold_session_template (pe.Node): Buffer node for BOLD session template data.
+            bold_session_template_reg (pe.Node): Buffer node for BOLD session template registration data.
+        """
         self.anat = anat
         self.template = template
         self.surfaces = surfaces
@@ -37,6 +51,15 @@ class BufferNodes:
 def get_run_level_buffer_nodes(
     run_dict: Dict[str, List[Path]], image_type: str
 ) -> Tuple[Dict[str, pe.Node], Dict[str, List[str]]]:
+    """Create buffer nodes for BOLD run-level data.
+
+    Args:
+        run_dict (Dict[str, List[Path]]): Dictionary of runs.
+        image_type (str): Type of image data.
+
+    Returns:
+        Tuple[Dict[str, pe.Node], Dict[str, List[str]]]: Buffer nodes and their input fields.
+    """
     buffer, buffer_inputs = {}, {}
     for run_type, runs in run_dict.items():
         n_runs = len(runs)
@@ -55,6 +78,16 @@ def get_run_level_buffer_nodes(
 
 
 def setup_buffer_nodes(wf_manager: WorkflowManager) -> BufferNodes:
+    """Set up buffer nodes for the session.
+
+    BOLD run-level buffers are not set-up here
+
+    Args:
+        wf_manager (WorkflowManager): Workflow manager object.
+
+    Returns:
+        BufferNodes: Buffer nodes for the workflow.
+    """
     # Native anatomical buffer
     anat_buffer = {}
     for anat_label, anat_path in wf_manager.anat.items():

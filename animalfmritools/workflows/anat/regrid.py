@@ -14,6 +14,25 @@ def init_regrid_anat_to_bold_wf(
     regrid_to_bold: bool = True,
     name: str = "regrid_anat_to_bold_wf",
 ) -> Workflow:
+    """Build a workflow to regrid an anatomical to a BOLD image.
+
+    This workflow includes N4 Bias Field Correction applied to the anatomical image.
+
+    Args:
+        regrid_to_bold (bool): True will match the resolution of the anatomical to the BOLD image. False does nothing. (default: True)
+        name (str): Name of workflow. (default: "regrid_anat_to_bold_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        anat: Anatomical
+        bold: BOLD reference
+
+    Workflow Outputs:
+        regridded_anat: Regridded anatomical
+    """
+
     workflow = Workflow(name=name)
 
     inputnode = pe.Node(
@@ -57,6 +76,28 @@ def init_regrid_template_to_bold_wf(
     force_isotropic: Optional[float] = None,
     name: str = "regrid_template_to_bold_wf",
 ) -> Workflow:
+    """Build a workflow to regrid an template to a BOLD image.
+
+    Args:
+        force_isotropic (Optional[float]): If a float value is specified, it will enforce the template to the desired isotropic resolution. Using None will align the template resolution with that of the BOLD image. (default: None)
+        name (str): Name of workflow. (default: "regrid_template_to_bold_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        template: Template
+        template_gm: Template gray matter mask
+        template_wm: Template white matter mask
+        template_csf: Template CSF mask
+        bold: BOLD reference
+
+    Workflow Outputs:
+        regridded_template: Regridded template
+        regridded_template_mask: Regridded template mask
+        regridded_template_tpms: Regridded merged masks of the template
+    """
+
     workflow = Workflow(name=name)
 
     inputnode = pe.Node(

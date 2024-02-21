@@ -8,6 +8,26 @@ from niworkflows.interfaces.confounds import NormalizeMotionParams
 def init_bold_hmc_wf(
     name: str = "bold_hmc_wf",
 ) -> Workflow:
+    """Build a workflow to apply head-motion correction (hmc) on a BOLD run.
+
+    Uses FSL's MCFLIRT to perform hmc.
+
+    Args:
+        name (str): Name of workflow. (default: "bold_hmc_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        bold: BOLD run
+        reference: BOLD reference image
+
+    Workflow Outputs:
+        hmc_mats: Transformation matrices of each BOLD volume to the BOLD reference image
+        rmsd_file: Relative displacement parameters
+        movpar_file: Text file with motion parameters
+    """
+
     workflow = Workflow(name=name)
 
     inputnode = pe.Node(

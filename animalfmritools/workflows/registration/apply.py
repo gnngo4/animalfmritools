@@ -24,24 +24,45 @@ def init_merge_bold_to_template_trans(
     use_anat_to_guide: bool = False,
     name: str = "merge_bold_to_template_transforms_wf",
 ) -> Workflow:
-    """
-    [Scenario A] If opposite phase-encoding (PE) BOLD runs are detected, then
-    susceptibility-induced distortion correction (SDC) warps are
-    estimated using FSL's topup.
-    Merge transforms
-    1) Dbold to Dboldtemplate
-    2) Dboldtemplate sdc warp
-    3) UDbold to UDboldtemplate
-    4) UDboldtemplate to anat [or anat_native]
-    5-) anat_native to anat
-    5) anat to template
+    """Build a workflow to merge all of the transformations together. This excludes head-motion correction.
 
-    [Scenario B] If opposite PE BOLD runs are not detected, then no SDC warp is estimated.
-    Merge transforms
-    1) Dbold to Dboldtemplate
-    2) Dboldtemplate to anat [or anat_native]
-    3-) anat_native to anat
-    3) anat to template
+    Notes:
+        [Scenario A] If opposite phase-encoding (PE) BOLD runs are detected, then susceptibility-induced distortion correction (SDC) warps are estimated using FSL's TOPUP.
+        Merge transforms
+        1) Dbold to Dboldtemplate
+        2) Dboldtemplate sdc warp
+        3) UDbold to UDboldtemplate
+        4) UDboldtemplate to anat [or anat_native]
+        5-) anat_native to anat
+        5) anat to template
+        [Scenario B] If opposite PE BOLD runs are not detected, then no SDC warp is estimated.
+        Merge transforms
+        1) Dbold to Dboldtemplate
+        2) Dboldtemplate to anat [or anat_native]
+        3-) anat_native to anat
+        3) anat to template
+
+    Args:
+        no_sdc (bool): True will enable scenario B. (default: False)
+        use_anat_to_guide (bool): True adds extra nodes to connect a anatnative-to-anat transformation. (default: False)
+        name (str): Name of workflow. (default: "merge_bold_to_template_transforms_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        regridded_anat: Regridded anatomical
+        regridded_template: Regridded template
+        anat_native_to_anat_secondary_warp: Anatomical native to anatomical template warp, inputted when `use_anat_to_guide==True`
+        Dbold_to_Dboldtemplate_aff: Distorted bold to distorted bold template affine (Scenario A/B)
+        Dboldtemplate_sdc_warp: Distorted bold susceptibility distortion correction warp (Scenario A)
+        UDbold_to_UDboldtemplate_aff: Undistorted bold to undistorted bold template affine (Scenario A)
+        UDboldtemplate_to_anat_aff: Undistorted bold to anatomical (template or native when `use_anat_to_guide==True`) (Scenario A)
+        Dboldtemplate_to_anat_aff: Distorted bold to anatomical (template or native when `use_anat_to_guide==True`) (Scenario B)
+        anat_to_template_warp: Anatomical (template or native) to template warp (Scenario A/B)
+
+    Workflow Outputs:
+        Dbold_to_template_warp: One-shot distorted bold to template warp
     """
 
     workflow = Workflow(name=name)
@@ -165,6 +186,26 @@ def init_trans_bold_to_template_wf(
     use_anat_to_guide: bool = False,
     name: str = "transform_bold_to_template_wf",
 ) -> Workflow:
+    """Build a workflow that transforms BOLD data into standard (or template) space.
+
+    Args:
+        no_sdc (bool): True will enable scenario B. (default: False)
+        reg_quick (bool): True will output transformation of only the first 10 BOLD volumes to standard space. (default=False)
+        use_anat_to_guide (bool): True adds extra nodes to connect a anatnative-to-anat transformation. (default: False)
+        name (str): Name of workflow. (default: "transform_bold_to_template_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        bold: Unprocessed BOLD data
+        regridded_anat: Regridded anatomical
+        regridded_template: Regridded template
+        Dbold_hmc_affs: Head-motion correction affines generated using MCFLIRT
+
+    Workflow Outputs:
+        bold_template_space: Minimally processed and standardized-to-template BOLD data
+    """
     workflow = Workflow(name=name)
 
     INPUTNODE_FILES = ["bold", "regridded_anat", "regridded_template", "Dbold_hmc_affs"]

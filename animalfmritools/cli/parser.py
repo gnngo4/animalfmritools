@@ -2,6 +2,17 @@ import argparse
 
 
 def bold_to_anat_dof(arg: str) -> int:
+    """Validate and convert the degree of freedom argument for BOLD to anatomical registration.
+
+    Args:
+        arg (str): Input argument.
+
+    Returns:
+        int: Validated degree of freedom value.
+
+    Raises:
+        argparse.ArgumentTypeError: If the input value is not one of [6, 7, 9, 12].
+    """
     arg_int = int(arg)
     if arg_int not in {6, 7, 9, 12}:
         raise argparse.ArgumentTypeError("Invalid option. Choose: [6, 7, 9, 12]")
@@ -9,8 +20,10 @@ def bold_to_anat_dof(arg: str) -> int:
 
 
 def setup_parser() -> argparse.ArgumentParser:
-    """
-    Set-up Python's ArgumentParser for animalfmritools
+    """Set up Python's ArgumentParser for animalfmritools.
+
+    Returns:
+        argparse.ArgumentParser: Configured argument parser.
     """
 
     parser = argparse.ArgumentParser()

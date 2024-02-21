@@ -33,15 +33,43 @@ PE_DIR_SCHEMA: Dict[str, List[str]] = {
 
 
 class BidsReaderInput(BaseModel):
+    """Input model for BIDS reader."""
+
     bids_dir: Path
 
 
 class BidsReader(BidsReaderInput):
+    """BIDS reader class.
+
+    Args:
+        bids_dir (Path): Path to the BIDS directory.
+
+    Attributes:
+        bids_dir (Path): Path to the BIDS directory.
+
+    Methods:
+        get_subjects: Retrieve a list of subjects.
+        get_sessions: Retrieve a list of sessions for a given subject.
+        get_anat: Retrieve anatomical images.
+        get_bold_runs: Retrieve BOLD runs.
+        get_fmap_runs: Retrieve field map runs.
+    """
+
     def __init__(self, bids_dir: Path):
+        """Initialize BIDS reader.
+
+        Args:
+            bids_dir (Path): Path to the BIDS directory.
+        """
         input_data = BidsReaderInput(bids_dir=bids_dir)
         super().__init__(**input_data.dict())
 
     def get_subjects(self) -> List[str]:
+        """Retrieve a list of subjects.
+
+        Returns:
+            List[str]: List of subject IDs.
+        """
         subdirs = []
         for i in self.bids_dir.iterdir():
             if i.is_dir() and i.name.startswith("sub-"):
@@ -51,6 +79,11 @@ class BidsReader(BidsReaderInput):
         return subdirs
 
     def get_sessions(self, sub_id: str) -> List[str]:
+        """Retrieve a list of sessions for a given subject.
+
+        Returns:
+            List[str]: List of sessions IDs.
+        """
         subdirs = []
         sub_dir = Path(f"{self.bids_dir}/{self._process_dir(sub_id,'sub')}")
         assert sub_dir.exists(), f"Directory [{sub_dir}] does not exist."
@@ -70,6 +103,18 @@ class BidsReader(BidsReaderInput):
         use_anat_to_guide: bool = False,
         contrast_type: str = "T2w",
     ) -> Dict[str, Path]:
+        """Retrieve anatomical images.
+
+        Args:
+            sub_id (str): Subject ID.
+            ses_id (Optional[str]): Session ID. (default: None)
+            force_anat (Optional[Path]): Force the use of a specific anatomical image. (default: None)
+            use_anat_to_guide (bool): Setting to True will use the anatomical image to guide the alignment. (default: False)
+            contrast_type (str): Type of contrast (i.e., this is denoted by the suffix of a BIDS-formatted NIFTI). (default: "T2w")
+
+        Returns:
+            Dict[str, Path]: Dictionary containing the path to the anatomical images.
+        """
         anat_native = self._find_last_t2w_run(sub_id, ses_id, contrast_type)
 
         if force_anat:
@@ -86,6 +131,17 @@ class BidsReader(BidsReaderInput):
     def get_bold_runs(
         self, sub_id: str, ses_id: str, ignore_tasks: Optional[List[str]] = None
     ) -> Dict[str, List[Path]]:
+        """Retrieve BOLD runs.
+
+        Args:
+            sub_id (str): Subject ID.
+            ses_id (str): Session ID.
+            ignore_tasks (Optional[List[str]]): List of task IDs to ignore. (default: None)
+
+        Returns:
+            Dict[str, List[Path]]: Dictionary containing BOLD runs.
+        """
+
         if ignore_tasks is None:
             ignore_tasks = []
         ignore_tasks = [f"task-{task_id}" if not task_id.startswith("task-") else task_id for task_id in ignore_tasks]
@@ -124,8 +180,14 @@ class BidsReader(BidsReaderInput):
         sub_id: str,
         ses_id: str,
     ) -> Dict[str, List[Path]]:
-        """
-        Currently, only supports TOPUP distortion correction
+        """Retrieve field map runs.
+
+        Args:
+            sub_id (str): Subject ID.
+            ses_id (str): Session ID.
+
+        Returns:
+            Dict[str, List[Path]]: Dictionary containing field map runs.
         """
 
         runs_dict = deepcopy(PE_DIR_SCHEMA)
@@ -153,6 +215,18 @@ class BidsReader(BidsReaderInput):
         ses_id: Optional[str] = None,
         contrast_type: str = "T2w",
     ) -> Path:
+        """Find the last anatomical run.
+
+        If more anatomicals are acquired, it is assumed that these are of higher quality.
+
+        Args:
+            sub_id (str): Subject ID.
+            ses_id (Optional[str]): Session ID. (default: None)
+            contrast_type (str): Type of contrast (i.e., this is denoted by the suffix of a BIDS-formatted NIFTI). (default: "T2w")
+
+        Returns:
+            Path: Path to the last T2w run.
+        """
         # If multiple T2w runs detected, grab the last one
         runs: List[Path] = []
         if ses_id is not None:
@@ -192,6 +266,16 @@ class BidsReader(BidsReaderInput):
         return runs[-1]
 
     def _find_t2w_across_sessions(self, sub_id: str, contrast_type: str = "T2w") -> List[Path]:
+        """Find all anatomicals across sessions.
+
+        Args:
+            sub_id (str): Subject ID.
+            contrast_type (str): Type of contrast (i.e., this is denoted by the suffix of a BIDS-formatted NIFTI). (default: "T2w")
+
+        Returns:
+            List[Path]: List of paths to T2w runs.
+        """
+
         runs = []
         ses_ids = self.get_sessions(sub_id)
         for _ses_id in ses_ids:
@@ -205,6 +289,14 @@ class BidsReader(BidsReaderInput):
         return runs
 
     def _remove_phase_parts(self, bold_list: List[Path]) -> List[Path]:
+        """Remove phase parts from BOLD runs.
+
+        Args:
+            bold_list (List[Path]): List of BOLD runs.
+
+        Returns:
+            List[Path]: List of BOLD runs with phase parts removed.
+        """
         return [bold_path for bold_path in bold_list if "_part-phase_" not in str(bold_path)]
 
     def _process_dir(self, entry, prefix: str) -> str:

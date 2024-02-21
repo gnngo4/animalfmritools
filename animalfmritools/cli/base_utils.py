@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from pydantic import BaseModel
 
@@ -16,6 +16,21 @@ SURFACE_DIR = {
 
 
 class WorkflowManager(BaseModel):
+    """Model to manage workflow parameters.
+
+    Attributes:
+        sub_id (str): Subject ID.
+        ses_id (str): Session ID.
+        bids_dir (Path): Directory containing BIDS-formatted data.
+        deriv_dir (Path): Directory to store pipeline's output.
+        scratch_dir (Path): Directory for temporary files.
+        anat (Dict[str, Path]): Anatomical image paths.
+        bold_runs (Dict[str, List[Path]]): BOLD run paths.
+        fmap_runs (Dict[str, List[Path]]): Fieldmap paths of opposite phase-encoded images.
+        template (Dict[str, Path]): Template image paths.
+        surfaces (Dict[str, Path]): Surface paths.
+    """
+
     sub_id: str
     ses_id: str
     bids_dir: Path
@@ -28,7 +43,16 @@ class WorkflowManager(BaseModel):
     surfaces: Dict[str, Path]
 
 
-def get_template_data(species_id: str) -> Dict[str, Path]:
+def get_template_data(species_id: str) -> Tuple[Dict[str, Path], Dict[str, Path]]:
+    """Retrieve template and surface data for a given species.
+
+    Args:
+        species_id (str): Identifier for the species. Only "marmoset" and "mouse" are supported.
+
+    Returns:
+        Tuple[Dict[str, Path], Dict[str, Path]]: Template and surface data paths.
+    """
+
     assert species_id in ["marmoset", "mouse"]
     template_base_dir = TEMPLATE_DIR[species_id]
     surface_base_dir = SURFACE_DIR[species_id]
@@ -89,6 +113,23 @@ def setup_workflow(
     use_anat_to_guide: bool = False,
     anat_contrast_type: str = "T2w",
 ) -> WorkflowManager:
+    """Set up the workflow manager.
+
+    Args:
+        species_id (str): Identifier for the species.
+        sub_id (str): Subject ID.
+        ses_id (str): Session ID.
+        bids_dir (Path): Directory containing BIDS-formatted data.
+        deriv_dir (Path): Directory to store pipeline's output.
+        scratch_dir (Path): Directory for temporary files.
+        force_anat (Optional[Path]): Force the use of a specific anatomical image. (default: None)
+        use_anat_to_guide (bool): Whether to use anatomical image to guide. (default: False)
+        anat_contrast_type (str): Type of anatomical contrast. (default: "T2w)
+
+    Returns:
+        WorkflowManager: Instance of WorkflowManager.
+    """
+
     bids_reader = BidsReader(bids_dir)
 
     template, surfaces = get_template_data(species_id)

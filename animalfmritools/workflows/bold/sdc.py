@@ -1,9 +1,14 @@
 from pathlib import Path
 
 from nipype.interfaces import utility as niu
+from nipype.interfaces.fsl import Merge
+from nipype.interfaces.fsl.maths import BinaryMaths
+from nipype.interfaces.fsl.utils import Split
+from nipype.interfaces.utility import Function
 from nipype.pipeline import engine as pe
 from niworkflows.engine.workflows import LiterateWorkflow as Workflow
 
+from animalfmritools.interfaces.fsl_topup import TOPUP, TOPUPAcqParams
 from animalfmritools.interfaces.rescale_nifti import RescaleNifti
 
 
@@ -19,15 +24,36 @@ def add_string_to_list(in_list, element):
 def init_bold_sdc_wf(
     forward_pe_json: Path,
     reverse_pe_json: Path,
-    RESCALE_FACTOR=0.1,
+    RESCALE_FACTOR: float = 0.1,
     name: str = "bold_sdc_wf",
 ):
-    from nipype.interfaces.fsl import Merge
-    from nipype.interfaces.fsl.maths import BinaryMaths
-    from nipype.interfaces.fsl.utils import Split
-    from nipype.interfaces.utility import Function
+    """Build a workflow to run susceptibility-distortion correction (sdc) using two opposite phase-encoded gradient-echo (GE) EPIs.
 
-    from animalfmritools.interfaces.fsl_topup import TOPUP, TOPUPAcqParams
+    Uses FSL's TOPUP to perform sdc. The pipeline automatically identifies BOLD runs with opposite phase encoding, extracts their reference images, or searches for opposite phase-encoded GE images in the fmap subdirectorydetect opposite phase-encoded BOLD runs, extract their reference images, or look for opposite phase-encoded GE images in the fmap subdirectory.
+
+    Args:
+        forward_pe_json (Path): Path of JSON metadata corresponding to the forward phase-encoded image.
+        reverse_pe_json (Path): Path of JSON metadata corresponding to the reverse phase-encoded image.
+        RESCALE_FACTOR (float): TOPUP is run of opposite phase-encoded images that are first rescaled. (default: 0.1)
+        name (str): Name of workflow. (default: "bold_sdc_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        forward_pe: Forward phase-encoded image
+        reverse_pe: Reverse phase-encoded image
+
+    Workflow Outputs:
+        sdc_warp: SDC warp for forward phase-encoded image (FSL format)
+        sdc_affine: Affine transform for forward phase-encoded image (FSL format)
+        sdc_bold: Undistorted forward phase-encoded image
+
+    See also:
+        - :func: `~animalfmritools.interfaces.rescale_nifti.RescaleNifti`
+        - :func: `~animalfmritools.interfaces.fsl_topup.TOPUP`
+        - :func: `~animalfmritools.interfaces.fsl_topup.TOPUPAcqParams`
+    """
 
     workflow = Workflow(name=name)
 

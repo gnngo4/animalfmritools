@@ -1,26 +1,27 @@
 from nipype.interfaces import utility as niu
 from nipype.pipeline import engine as pe
+from niworkflows.engine.workflows import LiterateWorkflow as Workflow
+
+from animalfmritools.interfaces.itk_to_fsl import C3dAffineTool, ConvertITKtoFSLWarp
 
 
 def init_itk_to_fsl_affine_wf(name="itk_to_fsl_affine_wf"):
+    """Build a workflow to convert affine transformation from itk-to-fsl format.
+
+    Args:
+        name (str): Name of workflow. (default: "itk_to_fsl_affine_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        itk_affine: Affine transformation (itk format)
+        source: Moving image
+        reference: Reference image
+
+    Workflow Outputs:
+        fsl_affine: Affine transformation (fsl format)
     """
-    Convert affine transformation from itk-to-fsl format.
-
-    Parameters
-    ----------
-
-    Inputs
-    ------
-
-    Outputs
-    -------
-
-    """
-    from niworkflows.engine.workflows import (
-        LiterateWorkflow as Workflow,
-    )
-
-    from animalfmritools.interfaces.itk_to_fsl import C3dAffineTool
 
     workflow = Workflow(name=name)
 
@@ -50,24 +51,21 @@ def init_itk_to_fsl_affine_wf(name="itk_to_fsl_affine_wf"):
 
 
 def init_itk_to_fsl_warp_wf(name="itk_to_fsl_warp_wf"):
+    """Build a workflow to convert warp transformation from itk-to-fsl format.
+
+    Args:
+        name (str): Name of workflow. (default: "itk_to_fsl_warp_wf")
+
+    Returns:
+        Workflow: The constructed workflow.
+
+    Workflow Inputs:
+        itk_warp: Warp transformation (itk format)
+        reference: Reference image
+
+    Workflow Outputs:
+        fsl_warp: Warp transformation (fsl format)
     """
-    Convert warp transformation from itk-to-fsl format.
-
-    Parameters
-    ----------
-
-    Inputs
-    ------
-
-    Outputs
-    -------
-
-    """
-    from niworkflows.engine.workflows import (
-        LiterateWorkflow as Workflow,
-    )
-
-    from animalfmritools.interfaces.itk_to_fsl import ConvertITKtoFSLWarp
 
     workflow = Workflow(name=name)
 
