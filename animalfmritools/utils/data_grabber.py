@@ -115,18 +115,20 @@ class BidsReader(BidsReaderInput):
         Returns:
             Dict[str, Path]: Dictionary containing the path to the anatomical images.
         """
-        anat_native = self._find_last_t2w_run(sub_id, ses_id, contrast_type)
 
         if force_anat:
             assert force_anat.exists(), f"--force_anat was set, but {force_anat} does not exist."
             if use_anat_to_guide:
-                print(f"Warning: Alignment order: {anat_native} > {force_anat} > TEMPLATE.")
-                return {"anat_native": anat_native, "anat_template": force_anat}
+                # print(f"Warning: Alignment order: {anat_native} > {force_anat} > TEMPLATE.")
+                return {
+                    "anat_native": self._find_last_t2w_run(sub_id, ses_id, contrast_type),
+                    "anat_template": force_anat,
+                }
             else:
-                print(f"Warning: Using {force_anat} as the anatomical image.")
+                # print(f"Warning: Using {force_anat} as the anatomical image.")
                 return {"anat_template": force_anat}
 
-        return {"anat_template": anat_native}
+        return {"anat_template": self._find_last_t2w_run(sub_id, ses_id, contrast_type)}
 
     def get_bold_runs(
         self, sub_id: str, ses_id: str, ignore_tasks: Optional[List[str]] = None
