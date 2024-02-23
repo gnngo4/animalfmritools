@@ -360,11 +360,14 @@ def run():
     # fmt: on
 
     # Register anat to template
+    TEMPLATE_THRESHOLDING = 5
+    skullstrip_dof = 12
     if args.species_id == 'marmoset':
         TEMPLATE_THRESHOLDING = 0.5
-    else:
-        TEMPLATE_THRESHOLDING = 5
-    reg_anat_to_template = init_reg_anat_to_template_wf(TEMPLATE_THRESHOLDING, name="reg_anat_to_template_wf")
+        skullstrip_dof = 6
+    reg_anat_to_template = init_reg_anat_to_template_wf(
+        TEMPLATE_THRESHOLDING, skullstrip_dof=skullstrip_dof, name="reg_anat_to_template_wf"
+    )
 
     # Register undistorted bold template to anat
     session_bold_run_input = buffer_nodes.bold_inputs[first_dir_type][0]

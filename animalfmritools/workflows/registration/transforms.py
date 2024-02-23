@@ -14,6 +14,8 @@ from niworkflows.interfaces.reportlets.registration import FLIRTRPT, ANTSApplyTr
 from animalfmritools.interfaces.ants_reg import RegistrationSyN
 from animalfmritools.workflows.registration.utils import init_itk_to_fsl_affine_wf, init_itk_to_fsl_warp_wf
 
+ALLOWED_DOFS = [6, 7, 9, 12]
+
 
 def connect_n4_nodes(
     inputnode: pe.Node,
@@ -383,7 +385,7 @@ def init_reg_UDboldtemplate_to_anat_wf(
 
 
 def init_reg_anat_to_template_wf(
-    template_thr: float, skullstrip_anat: bool = True, name: str = "reg_anat_to_template_wf"
+    template_thr: float, skullstrip_anat: bool = True, skullstrip_dof: int = 12, name: str = "reg_anat_to_template_wf"
 ) -> Workflow:
     """Build a workflow to run same-subject, anatomical to template registration.
 
@@ -392,6 +394,7 @@ def init_reg_anat_to_template_wf(
     Args:
         template_thr (float): Thresholding parameter for generating a skullstripped anatomical mask using a template-in-anatomical-space.
         skullstrip_anat (bool): True will enable skullstripping of anatomical. (default: True)
+        skullstrip_dof (int): Skullstripping of anat is performed using a template registration method. (default: 12)
         name (str): Name of workflow. (default: "reg_anat_to_template_wf")
 
     Returns:
@@ -407,6 +410,8 @@ def init_reg_anat_to_template_wf(
         fsl_warp: Warp from anatomical to template (FSL format)
         anat_brain: Skullstripped anatomical, outputted when `skullstrip_anat==True`
     """
+    assert skullstrip_dof in ALLOWED_DOFS
+
     workflow = Workflow(name=name)
 
     OUTPUTNODE_FIELDS = ["init_out_report", "out_report", "fsl_warp"]
@@ -454,7 +459,7 @@ def init_reg_anat_to_template_wf(
         # Brain extract anatomical
         anat_1_initreg = pe.Node(
             FLIRT(
-                dof=12,
+                dof=skullstrip_dof,
                 searchr_x=[-180, 180],
                 searchr_y=[-180, 180],
                 searchr_z=[-180, 180],
