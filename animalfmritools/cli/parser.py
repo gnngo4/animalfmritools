@@ -50,14 +50,14 @@ def setup_parser() -> argparse.ArgumentParser:
         "--species_id",
         default="mouse",
         type=str,
-        help="species ID - affects which template is chosen.\nOnly mouse, marmoset are supported.",
+        help="species ID - affects which template is chosen.\nOnly mouse, rat, and marmoset are supported.",
     )
 
     parser.add_argument(
         "--repetition_time",
         default=None,
         type=float,
-        help="Manual input repetition time (TR).\nMust specify if json file is missing",
+        help="Manual input repetition time (TR).\nMust specify if json file is missing.\nEnabling this feature will override repetition time found in json file.",
     )
 
     parser.add_argument(

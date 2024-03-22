@@ -7,10 +7,12 @@ from animalfmritools.utils.data_grabber import BidsReader
 
 TEMPLATE_DIR = {
     "mouse": Path("/opt/animalfmritools/animalfmritools/data_template/mouse/template"),  # ABAv3
+    "rat": Path("/opt/animalfmritools/animalfmritools/data_template/rat/template"),  # WHS
     "marmoset": Path("/opt/animalfmritools/animalfmritools/data_template/marmoset/template"),  # MBMv4
 }
 SURFACE_DIR = {
     "mouse": Path("/opt/animalfmritools/animalfmritools/data_template/mouse/surfaces/3k"),  # ABAv3
+    "rat": Path("/opt/animalfmritools/animalfmritools/data_template/rat/surfaces/7k"),  # WHS
     "marmoset": Path("/opt/animalfmritools/animalfmritools/data_template/marmoset/surfaces/10k"),  # MBMv4
 }
 
@@ -47,13 +49,13 @@ def get_template_data(species_id: str) -> Tuple[Dict[str, Path], Dict[str, Path]
     """Retrieve template and surface data for a given species.
 
     Args:
-        species_id (str): Identifier for the species. Only "marmoset" and "mouse" are supported.
+        species_id (str): Identifier for the species. Only "marmoset", "rat" and "mouse" are supported.
 
     Returns:
         Tuple[Dict[str, Path], Dict[str, Path]]: Template and surface data paths.
     """
 
-    assert species_id in ["marmoset", "mouse"]
+    assert species_id in ["marmoset", "mouse", "rat"]
     template_base_dir = TEMPLATE_DIR[species_id]
     surface_base_dir = SURFACE_DIR[species_id]
     if species_id == "mouse":
@@ -70,6 +72,23 @@ def get_template_data(species_id: str) -> Tuple[Dict[str, Path], Dict[str, Path]
             "rh_white": surface_base_dir / "ABAv3.rh.white.3k.surf.gii",
             "lh_pial": surface_base_dir / "ABAv3.lh.pial.3k.surf.gii",
             "rh_pial": surface_base_dir / "ABAv3.rh.pial.3k.surf.gii",
+            "lh_cortex": surface_base_dir / "cortex.lh.func.gii",
+            "rh_cortex": surface_base_dir / "cortex.rh.func.gii",
+        }
+    elif species_id == "rat":
+        template = {
+            "Base": template_base_dir / "WHS_SD_rat_T2star_v1.01_brain.nii.gz",
+            "CSF": template_base_dir / "pipeline_vs.nii.gz",
+            "Grey": template_base_dir / "pipeline_gm.nii.gz",
+            "White": template_base_dir / "pipeline_wm.nii.gz",
+        }
+        surfaces = {
+            "lh_midthickness": surface_base_dir / "WHS.lh.midthickness.7k.surf.gii",
+            "rh_midthickness": surface_base_dir / "WHS.rh.midthickness.7k.surf.gii",
+            "lh_white": surface_base_dir / "WHS.lh.white.7k.surf.gii",
+            "rh_white": surface_base_dir / "WHS.rh.white.7k.surf.gii",
+            "lh_pial": surface_base_dir / "WHS.lh.pial.7k.surf.gii",
+            "rh_pial": surface_base_dir / "WHS.rh.pial.7k.surf.gii",
             "lh_cortex": surface_base_dir / "cortex.lh.func.gii",
             "rh_cortex": surface_base_dir / "cortex.rh.func.gii",
         }

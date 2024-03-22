@@ -361,12 +361,10 @@ def run():
 
     # Register anat to template
     TEMPLATE_THRESHOLDING = 5
-    skullstrip_dof = 12
     if args.species_id == 'marmoset':
         TEMPLATE_THRESHOLDING = 0.5
-        skullstrip_dof = 6
     reg_anat_to_template = init_reg_anat_to_template_wf(
-        TEMPLATE_THRESHOLDING, skullstrip_dof=skullstrip_dof, name="reg_anat_to_template_wf"
+        TEMPLATE_THRESHOLDING, skullstrip_dof=12, name="reg_anat_to_template_wf"
     )
 
     # Register undistorted bold template to anat
@@ -487,6 +485,8 @@ def run():
             json_path = Path(str(bold_path).replace(".nii.gz", ".json"))
             try:
                 metadata = load_json_as_dict(json_path)
+                if args.repetition_time is not None:
+                    metadata["RepetitionTime"] = args.repetition_time
             except FileNotFoundError:
                 print(f"{json_path} not found.\nCreating empty metadata dictionary.")
                 assert args.repetition_time is not None, "Must specify --repetition-time argument."
