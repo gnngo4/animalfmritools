@@ -33,7 +33,7 @@ class C3dAffineToolOutputSpec(TraitedSpec):
 
 
 class C3dAffineTool(CommandLine):
-    _cmd = "c3d_affine_tool2"
+    _cmd = "c3d_affine_tool"
     input_spec = C3dAffineToolInputSpec
     output_spec = C3dAffineToolOutputSpec
 
