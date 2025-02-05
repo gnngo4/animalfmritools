@@ -23,6 +23,7 @@ RUN apt-get update && \
                     unzip && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+
 # FSL 6.0.5.1
 FROM downloader as fsl
 RUN mkdir -p /opt/fsl \
@@ -255,6 +256,24 @@ ENV PATH="/opt/afni-latest:$PATH" \
 # Workbench config
 ENV PATH="/opt/workbench/bin_linux64:$PATH" \
     LD_LIBRARY_PATH="/opt/workbench/lib_linux64:$LD_LIBRARY_PATH"
+
+# Matlab r2021a
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+                    wget && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+ARG MATLAB_RELEASE=r2021a
+RUN wget -q https://www.mathworks.com/mpm/glnxa64/mpm && \
+    chmod +x mpm && \
+    ./mpm install \
+        --release=${MATLAB_RELEASE} \
+        --destination=/opt/matlab \
+        --products MATLAB Image_Processing_Toolbox MATLAB_Compiler && \
+    rm -f mpm /tmp/mathworks_root.log
+
+# Compiled PALM
+COPY ["docker/palmstandaloneApplication", "/opt/PALM"]
 
 RUN ldconfig
 
