@@ -300,6 +300,8 @@ def get_empty_template(nifti_path: str) -> np.ndarray:
 
 def create_roi_array(roi_index, roi_path, hemi_path=None, hemi_idx=None) -> np.ndarray:
     # Load data
+    # import pdb; pdb.set_trace()
+
     roi_data = (nib.load(roi_path).get_fdata() > 0).astype(int)
 
     if hemi_path is not None and hemi_idx is not None:
@@ -329,8 +331,12 @@ def create_atlas(
     merged_atlas = get_empty_template(roi_nifti_list[0])
     atlas_annotations = []  # Set up empty annotation list
 
-    # for ix, ((roi_nifti, roi_parent_label), hemi_label) in enumerate(itertools.product(zip(roi_nifti_list, roi_parent_list), hemi_mapping.keys())): # Considers hemi
-    for ix, (roi_nifti, roi_parent_label) in enumerate(zip(roi_nifti_list, roi_parent_list)):
+    # for ix, (roi_nifti, roi_parent_label) in enumerate(zip(roi_nifti_list, roi_parent_list)):
+    import itertools
+
+    for ix, ((roi_nifti, roi_parent_label), hemi_label) in enumerate(
+        itertools.product(zip(roi_nifti_list, roi_parent_list), hemi_mapping.keys())
+    ):  # Considers hemi
         print(ix, roi_nifti, roi_parent_label)
 
         ix = ix + 1
@@ -341,12 +347,12 @@ def create_atlas(
 
         # Add reannotated ROI to a single array
         merged_atlas += create_roi_array(
-            ix, roi_nifti, hemi_path=None, hemi_idx=None
+            ix, roi_nifti, hemi_path=hemi_nifti, hemi_idx=hemi_mapping[hemi_label]
         )  # hemi_* set to None turns off hemispheric parsing
         # Add label to atlas annotations
         roi_label = extract_roi_name(roi_nifti)
-        # atlas_annotations.append( (ix, roi_parent_label, f"{roi_label}_{hemi_label}") ) # considers hemi
-        atlas_annotations.append((ix, roi_parent_label, f"{roi_label}"))
+        atlas_annotations.append((ix, roi_parent_label, f"{roi_label}_{hemi_label}"))  # considers hemi
+        # atlas_annotations.append((ix, roi_parent_label, f"{roi_label}"))
 
     # Round
     merged_atlas = np.round(merged_atlas)
@@ -403,7 +409,7 @@ def main_create_atlas(json_file, roi_dir, mouse_template_dir=MOUSE_TEMPLATE_DIR)
     cerebellar_cortex = search_for_roi_paths(roi_dir, all_label_hierarchies, k, "CBX", "CB")
 
     # Create atlas
-    hemi_nifti = mouse_template_dir / "roi-hemispheres_space-P56_downsample2.nii.gz"  # RH == 2 & LH == 1
+    hemi_nifti = mouse_template_dir / "roi-hemispheres_ABAv3.nii.gz"  # RH == 2 & LH == 1
     atlas_annots, atlas_nifti = create_atlas(
         isocortex + hpf + interbrain + midbrain + hindbrain,
         ["Isocortex"] * len(isocortex)
