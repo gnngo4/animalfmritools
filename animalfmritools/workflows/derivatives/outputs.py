@@ -39,9 +39,9 @@ class DerivativeOutputs(BaseModel):
 
     bold_preproc: Path
     bold_preproc_dtseries: Path
-    bold_confounds: Path
-    bold_confounds_metadata: Path
-    bold_roi_svg: Path
+    #bold_confounds: Path
+    #bold_confounds_metadata: Path
+    #bold_roi_svg: Path
     reg_from_Dbold_to_Dboldtemplate: Path
 
 
@@ -94,7 +94,6 @@ def get_source_files(base_info: BaseInfo, derivatives_dir: Path) -> DerivativeOu
     Returns:
         DerivativeOutputs: An instance of DerivativeOutputs containing the retrieved source files.
     """
-
     bold_preproc = Path(
         f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/func/"
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
@@ -105,6 +104,7 @@ def get_source_files(base_info: BaseInfo, derivatives_dir: Path) -> DerivativeOu
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
         f"_dir-{base_info.dir_id}_run-{base_info.run_id}_space-template_desc-preproc_bold.dtseries.nii"
     )
+    """
     bold_confounds = Path(
         f"{derivatives_dir}/sub-{base_info.sub_id}/ses-{base_info.ses_id}/func/"
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
@@ -120,6 +120,7 @@ def get_source_files(base_info: BaseInfo, derivatives_dir: Path) -> DerivativeOu
         f"sub-{base_info.sub_id}_ses-{base_info.ses_id}_task-{base_info.task_id}"
         f"_dir-{base_info.dir_id}_run-{base_info.run_id}_desc-confound_roi.svg"
     )
+    """
 
     """
     Registration is between single bold runs and PE-consistant bold referance run
@@ -134,12 +135,20 @@ def get_source_files(base_info: BaseInfo, derivatives_dir: Path) -> DerivativeOu
         f"_dir-{base_info.dir_id}_run-{base_info.run_id}_from-Dbold_to-Dboldtemplate.svg"
     )
 
+    """
     outputs = DerivativeOutputs(
         bold_preproc=bold_preproc,
         bold_preproc_dtseries=bold_preproc_dtseries,
         bold_confounds=bold_confounds,
         bold_confounds_metadata=bold_confounds_metadata,
         bold_roi_svg=bold_roi_svg,
+        reg_from_Dbold_to_Dboldtemplate=reg_from_Dbold_to_Dboldtemplate,
+    )
+    """
+
+    outputs = DerivativeOutputs(
+        bold_preproc=bold_preproc,
+        bold_preproc_dtseries=bold_preproc_dtseries,
         reg_from_Dbold_to_Dboldtemplate=reg_from_Dbold_to_Dboldtemplate,
     )
 

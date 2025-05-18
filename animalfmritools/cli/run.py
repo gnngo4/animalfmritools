@@ -1,11 +1,11 @@
 import sys
 
-sys.path.insert(1, "/opt/animalfmritools")
+sys.path.insert(1, "/app")
 import os
 
-import certifi
+#import certifi
 
-os.environ["REQUESTS_CA_BUNDLE"] = os.path.join(os.path.dirname(sys.argv[0]), certifi.where())
+#os.environ["REQUESTS_CA_BUNDLE"] = os.path.join(os.path.dirname(sys.argv[0]), certifi.where())
 from pathlib import Path
 
 from base_utils import setup_workflow
@@ -31,7 +31,7 @@ from animalfmritools.workflows.anat.regrid import (
     init_regrid_template_to_bold_wf,
 )
 from animalfmritools.workflows.bold.boldref import init_bold_ref_wf
-from animalfmritools.workflows.bold.confounds import init_bold_confs_wf
+#from animalfmritools.workflows.bold.confounds import init_bold_confs_wf
 from animalfmritools.workflows.bold.hmc import init_bold_hmc_wf
 from animalfmritools.workflows.bold.sdc import init_bold_sdc_wf
 from animalfmritools.workflows.bold.surface_mapping import init_bold_surf_wf
@@ -543,6 +543,7 @@ def run():
             # fmt: on
 
             # Estimate confounds
+            """
             bold_confs_wf = init_bold_confs_wf(
                 mem_gb=8,
                 metadata=metadata,
@@ -568,6 +569,7 @@ def run():
                 ]),
             ])
             # fmt: on
+            """
 
             # Reverse scaling of BOLD
             reverse_rescaling = pe.Node(
@@ -608,6 +610,7 @@ def run():
             )
 
             # fmt: off
+            """
             wf.connect([
                 (trans_Dbold_to_template, reverse_rescaling, [("outputnode.bold_template_space", "nifti_path")]),
                 (reverse_rescaling, bold_deriv_wf, [("rescaled_path", "inputnode.bold_preproc")]),
@@ -617,6 +620,15 @@ def run():
                     ("outputnode.confounds_file", "inputnode.bold_confounds"),
                     ("outputnode.rois_plot", "inputnode.bold_roi_svg"),
                 ]),
+                (reg_Dbold_to_Dboldtemplate, bold_deriv_wf, [("outputnode.out_report", "inputnode.reg_from_Dbold_to_Dboldtemplate")]),
+            ])
+            # fmt: on
+            """
+            # fmt: off
+            wf.connect([
+                (trans_Dbold_to_template, reverse_rescaling, [("outputnode.bold_template_space", "nifti_path")]),
+                (reverse_rescaling, bold_deriv_wf, [("rescaled_path", "inputnode.bold_preproc")]),
+                (surface_projection, bold_deriv_wf, [("outputnode.bold_dtseries", "inputnode.bold_preproc_dtseries")]),
                 (reg_Dbold_to_Dboldtemplate, bold_deriv_wf, [("outputnode.out_report", "inputnode.reg_from_Dbold_to_Dboldtemplate")]),
             ])
             # fmt: on
