@@ -6,14 +6,14 @@ from pydantic import BaseModel
 from animalfmritools.utils.data_grabber import BidsReader
 
 TEMPLATE_DIR = {
-    "mouse": Path("/opt/animalfmritools/animalfmritools/data_template/mouse/template"),  # ABAv3
-    "rat": Path("/opt/animalfmritools/animalfmritools/data_template/rat/template"),  # WHS
-    "marmoset": Path("/opt/animalfmritools/animalfmritools/data_template/marmoset/template"),  # MBMv4
+    "mouse": Path("/app/animalfmritools/data_template/mouse/template"),  # ABAv3
+    "rat": Path("/app/animalfmritools/data_template/rat/template"),  # WHS
+    "marmoset": Path("/app/animalfmritools/data_template/marmoset/template"),  # MBMv4
 }
 SURFACE_DIR = {
-    "mouse": Path("/opt/animalfmritools/animalfmritools/data_template/mouse/surfaces/3k"),  # ABAv3
-    "rat": Path("/opt/animalfmritools/animalfmritools/data_template/rat/surfaces/7k"),  # WHS
-    "marmoset": Path("/opt/animalfmritools/animalfmritools/data_template/marmoset/surfaces/10k"),  # MBMv4
+    "mouse": Path("/app/animalfmritools/data_template/mouse/surfaces/3k"),  # ABAv3
+    "rat": Path("/app/animalfmritools/data_template/rat/surfaces/7k"),  # WHS
+    "marmoset": Path("/app/animalfmritools/data_template/marmoset/surfaces/10k"),  # MBMv4
 }
 
 

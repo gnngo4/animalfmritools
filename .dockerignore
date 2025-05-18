@@ -1,1 +1,14 @@
 animalfmritools/data 
+notebooks
+
+# Ignore local venv
+.venv/
+
+# Containers
+animalfmritools.simg
+
+# Version control
+.git
+.gitignore
+.svn
+.hg
