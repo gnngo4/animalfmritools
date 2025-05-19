@@ -183,6 +183,7 @@ def init_merge_bold_to_template_trans(
 def init_trans_bold_to_template_wf(
     no_sdc: bool = False,
     reg_quick: bool = False,
+    num_procs: int = 4,
     use_anat_to_guide: bool = False,
     name: str = "transform_bold_to_template_wf",
 ) -> Workflow:
@@ -216,7 +217,7 @@ def init_trans_bold_to_template_wf(
     )
 
     merge_bold_to_template_trans = init_merge_bold_to_template_trans(no_sdc=no_sdc, use_anat_to_guide=use_anat_to_guide)
-    apply_bold_to_template = pe.Node(ApplyBoldToAnat(debug=reg_quick), name="apply_transformations")
+    apply_bold_to_template = pe.Node(ApplyBoldToAnat(debug=reg_quick, num_procs=num_procs), name="apply_transformations")
 
     if use_anat_to_guide:
         INPUTNODE_FILES += ["anat_native_to_anat_secondary_warp"]
