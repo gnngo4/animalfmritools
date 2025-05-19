@@ -60,35 +60,96 @@ from animalfmritools.workflows.registration.transforms import (
 
 RESCALE_FACTOR = 10  # Scale voxel sizes by 10 so that some neuroimaging tools will work for animals
 
+import typer
+from typing_extensions import Annotated, Optional
+from enum import Enum
 
-def run():
-    parser = setup_parser()
-    args = parser.parse_args()
+app = typer.Typer(help="Animal fMRI tools.")
 
-    # Set force anat
-    force_anat = Path(args.force_anat) if isinstance(args.force_anat, str) else args.force_anat
-    use_anat_to_guide = args.use_anat_to_guide
-    if args.use_anat_to_guide and not args.force_anat:
-        raise ValueError("--force_anat <anat_path> must be set.")
+"""Callbacks
+"""
 
-    # Set bold-to-anat affine
-    bold_to_anat_affine = (
-        Path(args.bold_to_anat_affine) if isinstance(args.bold_to_anat_affine, str) else args.bold_to_anat_affine
-    )
-    if args.bold_to_anat_affine:
-        assert bold_to_anat_affine.exists(), f"{bold_to_anat_affine} not found."
+def validate_subject_id(subject_id: str, bids_dir: Path) -> str:
+    # Pad with 'sub-' if not already done so
+    if subject_id.startswith("sub-"):
+        subject_id = subject_id.split("sub-")[-1]
 
-    # Subject info
+    subject_dir = bids_dir / f"sub-{subject_id}"
+    if not subject_dir.is_dir():
+        raise typer.BadParameter(f"Subject directory does not exist: {subject_dir}.")
+    
+    return subject_id
+
+def validate_session_id(session_id: str, bids_dir: Path, subject_id: str) -> str:
+    # Pad with 'ses-' if not already done so
+    if session_id.startswith("ses-"):
+        session_id = session_id.split("ses-")[-1]
+
+    session_dir = bids_dir / f"sub-{subject_id}" / f"ses-{session_id}"
+    if not session_dir.is_dir():
+        raise typer.BadParameter(f"Session directory does not exist: {session_dir}.")
+    
+    return session_id
+
+def validate_reg_dof_bold_to_anat(value: int) -> int:
+    allowed_dof = [6, 7, 9, 12]
+    if value not in allowed_dof:
+        raise typer.BadParameter(f"DOF must be one of: {allowed_dof}")
+    
+    return value
+
+def create_output_directory(path: Path) -> Path:
+    if not path.exists():
+        path.mkdir(parents=True, exist_ok=True)
+    
+    return path
+
+"""Enum for arguments with choices
+"""
+class Species(str, Enum):
+    MOUSE = 'mouse'
+    RAT = 'rat'
+    MARMOSET = 'marmoset'
+
+
+
+@app.command()
+def fmri_preprocess(
+    bids_dir: Annotated[Path, typer.Option("--bids-dir", "-d", exists=True, file_okay=False, dir_okay=True, readable=True, help="Path to the root BIDs directory.")],
+    subject_id: Annotated[str, typer.Option("--subject-id", "-s", help="Subject ID matching a directory in the BIDs folder (e.g., bids/sub-001).")],
+    session_id: Annotated[str, typer.Option("--session-id", "-S", help="Session ID matching a directory in the subject folder (e.g., bids/sub-001/ses-01).")],
+    derivatives_dir: Annotated[Path, typer.Option("--output-dir", "-o", exists=False, file_okay=False, dir_okay=True, writable=True, callback=create_output_directory, help="Output directory.")],
+    species: Annotated[Species, typer.Option("--species", "-p", help="Species name.", case_sensitive=False, show_choices=True)],
+    repetition_time: Annotated[Optional[float], typer.Option("--tr", "-t", show_default=True, help="Repetition time (TR) in seconds. Setting TR will override TR extracted from fMRI's metadata (.json).")] = None,
+    force_isotropic: Annotated[Optional[float], typer.Option("--force-isotropic", show_default=True, help="Force isotropic resampling to a specified resolution in mm.")] = None,
+    force_anat: Annotated[Optional[Path], typer.Option("--force-anat", exists=True, file_okay=True, dir_okay=False, readable=True, show_default=True, help="Manual input anatomical image (.nii.gz). Must specify if anatomical is missing.")] = None,
+    use_anat_to_guide: Annotated[bool, typer.Option("--use-anat-to-guide", show_default=True, help="Use an alternative anatomical to guide registration to the template.")] = False,
+    anat_contrast: Annotated[str, typer.Option("--anat-contrast", show_default=True, help="Contrast of the anatomical image denoted by the suffix of the image.")] = "T2w",
+    scratch_dir: Annotated[Path, typer.Option("--scratch-dir", show_default=True, help="Path to the Nipype workflow directory.")] = Path("/tmp"),
+    bold_to_anat_affine: Annotated[Optional[Path], typer.Option("--bold-to-anat-affine", exists=True, file_okay=True, dir_okay=False, readable=True, show_default=True, help="Manual input a bold to anatomical affine.")] = None,
+    bold_to_anat_dof: Annotated[int, typer.Option("--bold-to-anat-dof", show_default=True, help="Set DOF for registration from bold to anatomical.")] = 6,
+    reg_quick: Annotated[bool, typer.Option("--reg-quick", show_default=True, help="For debugging, processes only the first 10 fMRI volumes.")] = False,
+):
+    
+    """Validate
+    """
+    # Validate subject and session id
+    subject_id = validate_subject_id(subject_id, bids_dir)
+    session_id = validate_session_id(session_id, bids_dir, subject_id)
+    # Validate --use-anat-to-guide
+    if use_anat_to_guide and force_anat is None:
+        raise typer.BadParameter("--force-anat must be set when --use-anat-to-guide is enabled.")
+
+    """
+    Setup fMRI preprocessing workflow
+    """
+    
+    # Setup workflow
     wf_manager = setup_workflow(
-        args.species_id,
-        args.subject_id,
-        args.session_id,
-        args.bids_dir,
-        args.out_dir,
-        args.scratch_dir,
+        species, subject_id, session_id, bids_dir, derivatives_dir, scratch_dir,
         force_anat=force_anat,
         use_anat_to_guide=use_anat_to_guide,
-        anat_contrast_type=args.anat_contrast,
+        anat_contrast_type=anat_contrast,
     )
 
     # Instantiate workflow
@@ -261,13 +322,13 @@ def run():
     all_dir_types = list(buffer_nodes.bold_session.keys())
 
     # Save bold (run-level) outputs
-    base_info = load_base(args.subject_id, args.session_id)
+    base_info = load_base(subject_id, session_id)
     deriv_outputs = get_base_source_files(
         base_info,
         wf_manager.deriv_dir,
         first_dir_type,
         all_dir_types,
-        args.anat_contrast,
+        anat_contrast,
     )
     base_deriv_wf = init_base_preproc_derivatives_wf(
         deriv_outputs, name="base_derivatives", no_sdc=no_sdc, use_anat_to_guide=use_anat_to_guide
@@ -319,14 +380,14 @@ def run():
     )
 
     # Regrid template
-    if args.force_isotropic is not None:
+    if force_isotropic is not None:
         # TODO: clean up
         from nipype.interfaces.fsl import FLIRT
         from nipype.interfaces.utility import Function
 
         from animalfmritools.interfaces.functions import get_translation_component_from_nifti
 
-        flirt_iso = pe.Node(FLIRT(apply_isoxfm=args.force_isotropic), name="template_force_isotropic")
+        flirt_iso = pe.Node(FLIRT(apply_isoxfm=force_isotropic), name="template_force_isotropic")
         get_trans_component = pe.Node(
             interface=Function(
                 input_names=["nifti_path"], output_names=["translation"], function=get_translation_component_from_nifti
@@ -342,9 +403,9 @@ def run():
             (flirt_iso, get_trans_component, [("out_file", "nifti_path")]),
         ])
         # fmt: on
-        args.force_isotropic *= RESCALE_FACTOR
+        force_isotropic *= RESCALE_FACTOR
     regrid_template_to_bold = init_regrid_template_to_bold_wf(
-        force_isotropic=args.force_isotropic, name="regrid_template_to_bold_wf"
+        force_isotropic=force_isotropic, name="regrid_template_to_bold_wf"
     )
 
     # fmt: off
@@ -361,7 +422,7 @@ def run():
 
     # Register anat to template
     TEMPLATE_THRESHOLDING = 5
-    if args.species_id == 'marmoset':
+    if species == 'marmoset':
         TEMPLATE_THRESHOLDING = 0.5
     reg_anat_to_template = init_reg_anat_to_template_wf(
         TEMPLATE_THRESHOLDING, skullstrip_dof=12, name="reg_anat_to_template_wf"
@@ -373,7 +434,7 @@ def run():
     reg_UDboldtemplate_to_anat = None
     if no_sdc:
         reg_Dboldtemplate_to_anat = init_reg_Dboldtemplate_to_anat_wf(
-            dof=args.bold_to_anat_dof,
+            dof=bold_to_anat_dof,
             in_affine=bold_to_anat_affine,
             name="reg_Dboldtemplate_to_anat",
         )
@@ -391,7 +452,7 @@ def run():
         # fmt: on
     else:
         reg_UDboldtemplate_to_anat = init_reg_UDboldtemplate_to_anat_wf(
-            dof=args.bold_to_anat_dof, in_affine=bold_to_anat_affine, name="reg_UDboldtemplate_to_anat_wf"
+            dof=bold_to_anat_dof, in_affine=bold_to_anat_affine, name="reg_UDboldtemplate_to_anat_wf"
         )
         # fmt: off
         wf.connect([
@@ -485,18 +546,18 @@ def run():
             json_path = Path(str(bold_path).replace(".nii.gz", ".json"))
             try:
                 metadata = load_json_as_dict(json_path)
-                if args.repetition_time is not None:
-                    metadata["RepetitionTime"] = args.repetition_time
+                if repetition_time is not None:
+                    metadata["RepetitionTime"] = repetition_time
             except FileNotFoundError:
                 print(f"{json_path} not found.\nCreating empty metadata dictionary.")
-                assert args.repetition_time is not None, "Must specify --repetition-time argument."
+                assert repetition_time is not None, "Must specify --repetition-time argument."
                 metadata = {}
-                metadata["RepetitionTime"] = args.repetition_time
+                metadata["RepetitionTime"] = repetition_time
             except Exception as e:
                 print(f"An unexpected error occured: {e}\nCreating empty metadata dictionary.")
-                assert args.repetition_time is not None, "Must specify --repetition-time argument."
+                assert repetition_time is not None, "Must specify --repetition-time argument."
                 metadata = {}
-                metadata["RepetitionTime"] = args.repetition_time
+                metadata["RepetitionTime"] = repetition_time
 
             # Transform bold to template space
             boldref = init_bold_ref_wf(name=f"{prefix}_bold_reference")
@@ -506,7 +567,8 @@ def run():
             )
             trans_Dbold_to_template = init_trans_bold_to_template_wf(
                 no_sdc=no_sdc,
-                reg_quick=args.reg_quick,
+                reg_quick=reg_quick,
+                num_procs=10,
                 use_anat_to_guide=use_anat_to_guide,
                 name=f"{prefix}_transform_Dbold_to_template",
             )
@@ -576,7 +638,7 @@ def run():
                 RescaleNifti(rescale_factor=1 / RESCALE_FACTOR),
                 name=f"{prefix}_bold_reverse_rescale",
             )
-            if args.force_isotropic is not None:
+            if force_isotropic is not None:
                 # fmt: off
                 wf.connect([
                     (get_trans_component, reverse_rescaling, [("translation", "force_translation")]),
@@ -646,4 +708,4 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    app()
